@@ -1,3 +1,6 @@
+
+package LedgerSMB::Upgrade_Tests;
+
 =head1 NAME
 
 LedgerSMB::Upgrade_Tests - Upgrade tests for LedgerSMB
@@ -12,11 +15,14 @@ This module has a single function that returns upgrade tests.
 
 =cut
 
-package LedgerSMB::Upgrade_Tests;
 use strict;
 use warnings;
 use Moose;
-use LedgerSMB::App_State;
+use Moose::Util::TypeConstraints;
+use namespace::autoclean;
+use List::Util qw( first );
+
+use LedgerSMB::Locale qw(marktext);
 
 =head1 FUNCTIONS
 
@@ -42,10 +48,7 @@ Returns the test object with the name.
 
 sub get_by_name {
     my ($self, $name) = @_;
-    my @tests = $self->_get_tests;
-    for my $test (@tests){
-       return $test if $test->name eq $name;
-    }
+    return first { $_->name eq $name } $self->_get_tests;
 }
 
 =back
@@ -58,6 +61,8 @@ as such).
 =over
 
 =item name
+
+Name of the test
 
 =cut
 
@@ -104,38 +109,57 @@ Repair query table to run once per result.
 
 has table => (is => 'ro', isa => 'Str', required => 0);
 
-
 =item selectable_values
 
-Repair query column to get the values from
+Hash specifying for each column (identified by the key) which
+query to execute to retrieve the values to fill the drop-down with.
+
+Each query needs to return 2 columns: C<text> and C<value>, where
+C<value> is the value to be stored in the (fixed) record and
+C<text> is the textual value to be presented in the UI.
 
 =cut
 
-has selectable_values => (is => 'ro', isa => 'Str', required => 0);
+has selectable_values => (is => 'ro', isa => 'HashRef', required => 0);
 
-=item id_where
+=item force_queries
 
-Repair query key to set the values if we can repair
-
-=cut
-
-has id_where => (is => 'ro', isa => 'Str', required => 0, default => 'id');
-
-=item id_column
-
-Repair column to use as id
+Array of queries to run on Force. Typically, they will be use to remove missing
+or invalid values from tables. For example, removing references to a missing
+business discount from the customer and vendor tables. The data is still good
+because the discount has been applied but we cannot find the actual values at
+the time.
 
 =cut
 
-has id_column => (is => 'ro', isa => 'Str', required => 0, default => 'id');
+has force_queries => (is => 'ro', isa => 'ArrayRef', required => 0);
 
-=item column
+=item insert
 
-Repair query column to run once per result
+Insert data instead of update. This to set defaults on a very limited subset
+of tables. Business, for example isn't required in SQL-Ledger but mandatory for
+LedgerSMB.
 
 =cut
 
-has column => (is => 'ro', isa => 'Str', required => 0);
+has insert => (is => 'ro', isa => 'Bool', required => 0, default => 0);
+
+=item id_columns
+
+Repair columns to use as ids
+
+=cut
+
+has id_columns => (is => 'ro', isa => 'ArrayRef[Str]', required => 0,
+                   default => sub { return ['id'] });
+
+=item columns
+
+Repair query columns to run once per result
+
+=cut
+
+has columns => (is => 'ro', isa => 'ArrayRef[Str]', required => 0);
 
 =item display_cols
 
@@ -157,35 +181,88 @@ has display_name => (is => 'ro', isa => 'Str', required => 1);
 
 Human readable instructions for test, localized.
 
-=back
-
 =cut
 
 has instructions => (is => 'ro', isa => 'Str', required => 1);
 
+=item buttons
+
+Enabled buttons
+
+=cut
+
+subtype 'button'
+    => as 'Str'
+    => where { $_ =~ /Save and Retry|Cancel|Force|Skip/ }
+    => message { "Invalid button '$_'" };
+
+has buttons => (is => 'ro', isa => 'ArrayRef[button]',
+    default => sub { return ['Save and Retry', 'Cancel']}, required => 0);
+
+=item tooltips
+
+Tooltip for each button.
+Validate that buttons are enabled for each tooltip, then prepend defaults
+and override with test specific labeling.
+
+=cut
+
+has tooltips => (is => 'ro',
+    isa => 'Maybe[HashRef[Str]]', required => 0,
+    default => undef,   # Force initializer call
+    initializer => sub {
+        my ( $self, $value, $writer_sub_ref, $attribute_meta ) = @_;
+        $value //= {};
+        my %defaults = ('Save and Retry' => marktext('Save the fixes provided and attempt to continue migration'),
+                                'Cancel' => marktext('Cancel the <b>whole migration</b>'));
+        for my $tooltip (keys %defaults) {
+            $value->{$tooltip} //= $defaults{$tooltip}
+                if grep( /^$tooltip/, @{$self->{buttons}});
+        }
+        $writer_sub_ref->($value);
+    }
+);
+
+=item skipable
+
+Can this test be skipped
+
+=cut
+
+has skipable => (is =>'ro', isa => 'Maybe[Bool]', lazy => 1,
+                 default =>  sub {
+                    return grep(/^Skip$/, @{$_[0]->{buttons}}) == 1;
+                 }
+);
+
+=back
+
+=head1 Methods
+
+=cut
 
 sub _get_tests {
     my ($request) = @_;
 
     my @tests;
-    my $locale = LedgerSMB::App_State::Locale;
-
 
 # 1.2-1.3 tests
 
 push @tests, __PACKAGE__->new(
         test_query =>
-           "select id, customernumber, name, address1, city, state, zipcode
-                   from customer where customernumber in
-                    (SELECT customernumber from customer
-                   GROUP BY customernumber
-                   HAVING count(*) > 1)",
- display_name => $locale->text('Unique Customernumber'),
- instructions => $locale->text(
-                   'Please make all customer numbers unique'),
-         name => 'unique_customernumber',
- display_cols => ['customernumber', 'name', 'address1', 'city', 'state', 'zip'],
-       column => 'customernumber',
+           q{select count(*) as customer_count
+              from customer
+             where (select count(*)
+                      from chart
+                     where 'AR' = ANY(string_to_array(link,':'))) > 0
+            having count(*) = 0},
+ display_name => marktext('AR account available when customers defined'),
+ instructions => marktext(
+                   q(When customers are defined, an AR account must be defined,
+ however, your setup doesn't. Please go back and define one.)),
+         name => 'customers_require_ar',
+ display_cols => [],
+      columns => [],
         table => 'customer',
       appname => 'ledgersmb',
   min_version => '1.2',
@@ -194,17 +271,39 @@ push @tests, __PACKAGE__->new(
 
 push @tests, __PACKAGE__->new(
         test_query =>
-           "select id, vendornumber, name, address1, city, state, zipcode
-                   from vendor where vendornumber in
-                    (SELECT vendornumber from vendor
-                   GROUP BY vendornumber
-                   HAVING count(*) > 1)",
- display_name => $locale->text('Unique Vendornumber'),
- instructions => $locale->text(
-                   'Please make all vendor numbers unique'),
-         name => 'unique_vendornumber',
- display_cols => ['vendornumber', 'name', 'address1', 'city', 'state', 'zip'],
-       column => 'customernumber',
+           q{select count(*) as vendor_count
+              from vendor
+             where (select count(*)
+                      from chart
+                     where 'AP' = ANY(string_to_array(link,':'))) > 0
+            having count(*) = 0},
+ display_name => marktext('AP account available when vendors defined'),
+ instructions => marktext(
+                   q(When vendors are defined, an AP account must be defined,
+ however, your setup doesn't. Please go back and define one.)),
+         name => 'vendors_require_ap',
+ display_cols => [],
+      columns => [],
+        table => 'vendor',
+      appname => 'ledgersmb',
+  min_version => '1.2',
+  max_version => '1.2'
+);
+
+
+push @tests, __PACKAGE__->new(
+        test_query =>
+           'select id, customernumber, name, address1, city, state, zipcode
+                   from customer where customernumber in
+                    (SELECT customernumber from customer
+                   GROUP BY customernumber
+                   HAVING count(*) > 1)',
+ display_name => marktext('Unique Customernumber'),
+ instructions => marktext(
+                   'Please make all customer numbers unique'),
+         name => 'unique_customernumber',
+ display_cols => ['customernumber', 'name', 'address1', 'city', 'state', 'zip'],
+      columns => ['customernumber'],
         table => 'customer',
       appname => 'ledgersmb',
   min_version => '1.2',
@@ -212,13 +311,32 @@ push @tests, __PACKAGE__->new(
 );
 
 push @tests, __PACKAGE__->new(
-   test_query => "SELECT * FROM employee WHERE employeenumber IS NULL",
- display_name => $locale->text('No Null employeenumber'),
- instructions => $locale->text(
+        test_query =>
+           'select id, vendornumber, name, address1, city, state, zipcode
+                   from vendor where vendornumber in
+                    (SELECT vendornumber from vendor
+                   GROUP BY vendornumber
+                   HAVING count(*) > 1)',
+ display_name => marktext('Unique Vendornumber'),
+ instructions => marktext(
+                   'Please make all vendor numbers unique'),
+         name => 'unique_vendornumber',
+ display_cols => ['vendornumber', 'name', 'address1', 'city', 'state', 'zip'],
+      columns => ['vendornumber'],
+        table => 'customer',
+      appname => 'ledgersmb',
+  min_version => '1.2',
+  max_version => '1.2'
+);
+
+push @tests, __PACKAGE__->new(
+   test_query => 'SELECT * FROM employee WHERE employeenumber IS NULL',
+ display_name => marktext('No Null employeenumber'),
+ instructions => marktext(
                    'Enter employee numbers where they are missing'),
          name => 'null_employeenumber',
  display_cols => ['login', 'name', 'employeenumber'],
-       column => 'employeenumber',
+      columns => ['employeenumber'],
         table => 'employee',
       appname => 'ledgersmb',
   min_version => '1.2',
@@ -226,14 +344,14 @@ push @tests, __PACKAGE__->new(
 );
 
 push @tests, __PACKAGE__->new(
-   test_query => "SELECT * FROM employee
-                   WHERE not name ~ '[[:alnum:]_]'::text",
+   test_query => q{SELECT * FROM employee
+                   WHERE not name ~ '[[:alnum:]_]'::text},
          name => 'minimal_employee_name_requirements',
- display_name => $locale->text("Employee name doesn't meet minimal requirements (e.g. non-empty, alphanumeric)"),
- instructions => $locale->text(
+ display_name => marktext('Employee name doesn\'t meet minimal requirements (e.g. non-empty, alphanumeric)'),
+ instructions => marktext(
      'Make sure every name consists of alphanumeric characters (and underscores) only and is at least one character long'),
  display_cols => ['login', 'name', 'employeenumber'],
-       column => 'name',
+      columns => ['name'],
         table => 'employee',
       appname => 'ledgersmb',
   min_version => '1.2',
@@ -247,11 +365,11 @@ push @tests, __PACKAGE__->new(
                         GROUP BY employeenumber
                           HAVING count(*) > 1)',
          name => 'duplicate_employee_numbers',
- display_name => $locale->text('Duplicate employee numbers'),
- instructions => $locale->text(
+ display_name => marktext('Duplicate employee numbers'),
+ instructions => marktext(
                    'Make employee numbers unique'),
  display_cols => ['login', 'name', 'employeenumber'],
-       column => 'employeenumber',
+      columns => ['employeenumber'],
         table => 'employee',
       appname => 'ledgersmb',
   min_version => '1.2',
@@ -259,18 +377,18 @@ push @tests, __PACKAGE__->new(
 );
 
 push @tests, __PACKAGE__->new(
-   test_query => "select * from parts where obsolete is not true
+   test_query => 'select * from parts where obsolete is not true
                   and partnumber in
                   (select partnumber from parts
                   WHERE obsolete is not true
                   group by partnumber having count(*) > 1)
-                  order by partnumber",
+                  order by partnumber',
          name => 'duplicate_partnumbers',
- display_name => $locale->text('Unique nonobsolete partnumbers'),
- instructions => $locale->text(
+ display_name => marktext('Unique nonobsolete partnumbers'),
+ instructions => marktext(
                    'Make non-obsolete partnumbers unique'),
  display_cols => ['partnumber', 'description', 'sellprice'],
-       column => 'partnumber',
+      columns => ['partnumber'],
         table => 'parts',
       appname => 'ledgersmb',
   min_version => '1.2',
@@ -281,12 +399,12 @@ push @tests, __PACKAGE__->new(
    test_query => 'SELECT * from ar where invnumber in (
                    select invnumber from ar
                    group by invnumber having count(*) > 1)',
- display_name => $locale->text('Unique AR Invoice numbers'),
- instructions => $locale->text(
+ display_name => marktext('Unique AR Invoice numbers'),
+ instructions => marktext(
                    'Make invoice numbers unique'),
          name => 'unique_ar_invnumbers',
- display_cols =>  ['invnumber', 'transdate', 'amount', 'netamount', 'paid'],
-       column =>  'invnumber',
+ display_cols => ['invnumber', 'transdate', 'amount', 'netamount', 'paid'],
+      columns => ['invnumber'],
         table =>  'ar',
       appname => 'ledgersmb',
   min_version => '1.2',
@@ -296,11 +414,12 @@ push @tests, __PACKAGE__->new(
 # New tests in 1.4
 
 push @tests, __PACKAGE__->new(
-   test_query => "select * from acc_trans WHERE amount IS NULL",
- display_name => $locale->text('No NULL Amounts'),
+   test_query => 'select * from acc_trans WHERE amount IS NULL',
+ display_name => marktext('No NULL Amounts'),
          name => 'no_null_ac_amounts',
- display_cols => ["trans_id", "chart_id", "transdate"],
- instructions => $locale->text(
+ display_cols => ['trans_id', 'chart_id', 'transdate'],
+   id_columns => ['trans_id'],
+ instructions => marktext(
                    'There are NULL values in the amounts column of your
 source database. Please either find professional help to migrate your
 database, or delete the offending rows through PgAdmin III or psql'),
@@ -310,134 +429,163 @@ database, or delete the offending rows through PgAdmin III or psql'),
 );
 
 push @tests, __PACKAGE__->new(
-   test_query => "-- Select transactions without charts where removing them would unbalance tha transaction
-                                        WITH ac1 AS (
-                                        SELECT DISTINCT trans_id, chart_id, MIN(transdate) as transdate, ROUND(CAST(SUM(amount) AS NUMERIC),2) AS amount
-                                                FROM acc_trans
-                                                WHERE trans_id IN (
-                                                        SELECT trans_id FROM (
-                                                                SELECT trans_id, SUM(amount) as amount from acc_trans
-                                                                WHERE chart_id IS NULL
-                                                                GROUP BY trans_id) as a
-                                                        WHERE a.amount <> 0)
-                                                AND chart_id IS NULL
-                                                GROUP BY trans_id, chart_id
-                                                ORDER BY trans_id, transdate
-                                ),
-                                -- Hint the user about the type of the remaining entries
-                                ac2 AS (
-                                        SELECT DISTINCT ac.trans_id,SUBSTR(c.link,1,2) AS type
-                                        FROM acc_trans ac
-                                        JOIN chart c ON chart_id = c.id
-                                        WHERE trans_id IN ( SELECT trans_id FROM ac1)
-                                        AND c.link ~ 'amount'
-                                )
-                                -- Present data
-                                SELECT * from ac1
-                                LEFT JOIN ac2 ON (ac1.trans_id = ac2.trans_id)
-                                ORDER BY ac1.trans_id",
- display_name => $LedgerSMB::App_State::Locale->text('No unassigned amounts in Transactions'),
-         name => 'no_unbalanced_ac_transactions',
- display_cols => ["trans_id", "type", "chart_id", "transdate", "amount"],
- instructions => $LedgerSMB::App_State::Locale->text(
-                   'The following transactions have unassigned amounts'),
-                table => 'acc_trans',
-selectable_values => "SELECT concat(accno,' -- ',description) AS id, id as value
-                                          FROM chart
-                                          WHERE charttype = 'A'
-                                          ORDER BY id",
-           column => 'chart_id',
-        id_column => 'trans_id',
-         id_where => 'chart_id IS NULL AND trans_id',
-      appname => 'sql-ledger',
-  min_version => '2.7',
-  max_version => '3.0'
-);
-
-push @tests, __PACKAGE__->new(
-   test_query => "select *, eca.id as id  from entity_credit_account eca
+   test_query => 'select *, eca.id as id  from entity_credit_account eca
                      join entity_class ec on eca.entity_class = ec.id
                      join entity e on eca.entity_id = e.id
                    where meta_number in
                        (select meta_number from entity_credit_account
                         group by meta_number having count(*) > 1)
-                   order by meta_number",
- display_name => $locale->text('No duplicate meta_numbers'),
+                   order by meta_number',
+ display_name => marktext('No duplicate meta_numbers'),
          name => 'no_meta_number_dupes',
  display_cols => [ 'meta_number', 'class', 'description', 'name' ],
-       column => 'meta_number',
+      columns => ['meta_number'],
         table => 'entity_credit_account',
- instructions => $locale->text("Make sure all meta numbers are unique."),
+ instructions => marktext('Make sure all meta numbers are unique.'),
       appname => 'ledgersmb',
-  min_version => '1.2',
+  min_version => '1.3',
   max_version => '1.4'
 );
 
 push @tests, __PACKAGE__->new(
-   test_query => "select distinct gifi_accno from chart
+   test_query => q{select distinct gifi_accno from chart
                    where not exists (select 1
                                        from gifi
                                       where gifi.accno = chart.gifi_accno)
                          and gifi_accno is not null
-                         and gifi_accno !~ '^\\s*\$'",
- display_name => $locale->text('GIFI accounts not in "gifi" table'),
+                         and gifi_accno !~ '^\s*$'},
+ display_name => marktext('GIFI accounts not in "gifi" table'),
          name => 'missing_gifi_table_rows',
  display_cols => [ 'gifi_accno' ],
         table => 'chart',
- instructions => $locale->text("Please use the 1.2 UI to add the GIFI accounts"),
+ instructions => marktext('Please use the 1.2 UI to add the GIFI accounts'),
       appname => 'ledgersmb',
   min_version => '1.2',
   max_version => '1.2'
-);
+    );
 
 push @tests, __PACKAGE__->new(
-   test_query => "select distinct gifi_accno as accno from chart
-                   where not exists (select 1
-                                       from gifi
-                                      where gifi.accno = chart.gifi_accno)
-                         and gifi_accno is not null
-                         and gifi_accno !~ '^\\s*\$'",
- display_name => $locale->text('GIFI accounts not in "gifi" table'),
-         name => 'missing_gifi_table_rows',
- display_cols => [ 'accno', 'description' ],
-        table => 'gifi',
-       column => 'description',
-    id_column => 'accno',
-     id_where => 'description IS NULL AND accno',
- instructions => $locale->text("Please add the missing GIFI accounts"),
+        test_query =>
+           q{select count(*) as customer_count
+              from customer
+             where (select count(*)
+                      from chart
+                     where 'AR' = ANY(string_to_array(link,':'))) > 0
+            having count(*) = 0},
+ display_name => marktext('AR account available when customers defined'),
+ instructions => marktext(
+                   q(When customers are defined, an AR account must be defined,
+ however, your setup doesn't. Please go back and define one.)),
+         name => 'customers_require_ar',
+ display_cols => [],
+      columns => [],
+        table => 'customer',
       appname => 'sql-ledger',
   min_version => '2.7',
   max_version => '3.0'
 );
 
+push @tests, __PACKAGE__->new(
+        test_query =>
+           q{select count(*) as vendor_count
+              from vendor
+             where (select count(*)
+                      from chart
+                     where 'AP' = ANY(string_to_array(link,':'))) > 0
+            having count(*) = 0},
+ display_name => marktext('AP account available when vendors defined'),
+ instructions => marktext(
+                   q(When vendors are defined, an AP account must be defined,
+ however, your setup doesn't. Please go back and define one.)),
+         name => 'vendors_require_ap',
+ display_cols => [],
+      columns => [],
+        table => 'vendor',
+      appname => 'ledgersmb',
+  min_version => '2.7',
+  max_version => '3.0'
+);
+
+
 
 push @tests, __PACKAGE__->new(
-   test_query => "select distinct gifi_accno from account
+   test_query => q{select distinct gifi_accno as accno from chart
+                   where not exists (select 1
+                                       from gifi
+                                      where gifi.accno = chart.gifi_accno)
+                         and gifi_accno is not null
+                         and charttype <> 'H'
+                         and gifi_accno !~ '^\s*$'},
+ display_name => marktext('GIFI accounts not in "gifi" table'),
+         name => 'missing_gifi_table_rows',
+ display_cols => [ 'accno', 'description' ],
+        table => 'gifi',
+      columns => ['description'],
+   id_columns => ['accno'],
+ instructions => marktext('Please add the missing GIFI accounts'),
+      appname => 'sql-ledger',
+  min_version => '2.7',
+  max_version => '3.0'
+);
+
+push @tests, __PACKAGE__->new(
+   test_query => q{select distinct gifi_accno from account
                    where not exists (select 1
                                        from gifi
                                       where gifi.accno = account.gifi_accno)
                          and gifi_accno is not null
-                         and gifi_accno !~ '^\\s*\$'",
- display_name => $locale->text('GIFI accounts not in "gifi" table'),
+                         and gifi_accno !~ '^\s*$'},
+ display_name => marktext('GIFI accounts not in "gifi" table'),
          name => 'missing_gifi_table_rows',
  display_cols => [ 'gifi_accno' ],
         table => 'account',
- instructions => $locale->text("Please use the 1.3/1.4 UI to add the GIFI accounts"),
+ instructions => marktext('Please use the 1.3/1.4 UI to add the GIFI accounts'),
+      appname => 'ledgersmb',
+  min_version => '1.3',
+  max_version => '1.4'
+);
+
+push @tests, __PACKAGE__->new(
+   test_query => q{select * from from cr_coa_to_account ccta
+                   where chart_id in (select crcoa.chart_id
+                                        from cr_coa_to_account crcoa
+                                       where ccta.chart_id = crcoa.chart_id
+                                    group by crcoa.chart_id
+                                      having count(crcoa.chart_id) > 1)},
+ display_name => marktext('Accounts marked for recon -- once'),
+         name => 'non_duplicate_recon_accounts_marker',
+ display_cols => [ 'chart_id', 'account' ],
+        table => 'cr_coa_to_account',
+ instructions => marktext('Please use pgAdmin3 or psql to remove the duplicates'),
+      appname => 'ledgersmb',
+  min_version => '1.3',
+  max_version => '1.4'
+);
+
+push @tests, __PACKAGE__->new(
+   test_query => q{select * from from cr_coa_to_account ccta
+                   where not exists (select 1
+                                       from account
+                                      where account.id = ccta.chart_id)},
+ display_name => marktext('Accounts marked for recon exist'),
+         name => 'recon_accounts_exist',
+ display_cols => [ 'chart_id', 'account' ],
+        table => 'cr_coa_to_account',
+ instructions => marktext(q(Please use pgAdmin3 or psql to look up the 'chart_id' value in the 'account' table and change it to an existing value)),
       appname => 'ledgersmb',
   min_version => '1.3',
   max_version => '1.4'
 );
 
 
-
 #=pod
 
 #  push @tests, __PACKAGE__->new(
 #     test_query => "select * from customer where arap_accno_id is null",
-#   display_name => $locale->text('Empty AR account'),
+#   display_name => marktext('Empty AR account'),
 #           name => 'no_null_ar_accounts',
 #   display_cols => [ 'id', 'name', 'contact' ],
-#   instructions => $locale->text("Please correct the empty AR accounts"),
+#   instructions => marktext("Please correct the empty AR accounts"),
 #        appname => 'sql-ledger',
 #    min_version => '2.7',
 #    max_version => '3.0'
@@ -445,10 +593,10 @@ push @tests, __PACKAGE__->new(
 
 #  push @tests, __PACKAGE__->new(
 #     test_query => "select * from vendor where arap_accno_id is null",
-#   display_name => $locale->text('Empty AP account'),
+#   display_name => marktext('Empty AP account'),
 #           name => 'no_null_ap_accounts',
 #   display_cols => [ 'id', 'name', 'contact' ],
-#   instructions => $locale->text("Please correct the empty AP accounts"),
+#   instructions => marktext("Please correct the empty AP accounts"),
 #        appname => 'sql-ledger',
 #    min_version => '2.7',
 #    max_version => '3.0'
@@ -459,17 +607,17 @@ push @tests, __PACKAGE__->new(
 
 
 push @tests,__PACKAGE__->new(
-    test_query => "select *
+    test_query => q{select *
                     from chart
                    where charttype = 'A'
-                     and category not in ('A', 'L', 'Q', 'I', 'E')",
-    display_name => $locale->text('Unsupported account categories'),
+                     and category not in ('A', 'L', 'Q', 'I', 'E')},
+    display_name => marktext('Unsupported account categories'),
     name => 'unsupported_account_types',
     display_cols => ['category', 'accno', 'description'],
- instructions => $locale->text(
+ instructions => marktext(
                    'Please make sure all accounts have a category of
 (A)sset, (L)iability, e(Q)uity, (I)ncome or (E)xpense.'),
-    column => 'category',
+   columns => ['category'],
     table => 'chart',
     appname => 'sql-ledger',
     min_version => '2.7',
@@ -477,19 +625,19 @@ push @tests,__PACKAGE__->new(
     );
 
 push @tests,__PACKAGE__->new(
-    test_query => "select *
+    test_query => q{select *
                     from chart
                    where charttype = 'A'
                      and link ~ '(^|:)(AR|AP|IC)(:|\$)'
-                     and link ~ '(AR|AP|IC)[^:]'",
-    display_name => $locale->text('Unsupported account link combinations'),
+                     and link ~ '(AR|AP|IC)[^:]'},
+    display_name => marktext('Unsupported account link combinations'),
     name => 'unsupported_account_links',
     display_cols => ['accno', 'description', 'link'],
- instructions => $locale->text(
+ instructions => marktext(
                    'An account can either be a summary account (which have a
 link of "AR", "AP" or "IC" value) or be linked to dropdowns (having any
 number of "AR_*", "AP_*" and/or "IC_*" links concatenated by colons (:).'),
-    column => 'link',
+   columns => ['link'],
     table => 'chart',
     appname => 'sql-ledger',
     min_version => '2.7',
@@ -497,17 +645,17 @@ number of "AR_*", "AP_*" and/or "IC_*" links concatenated by colons (:).'),
     );
 
 push @tests,__PACKAGE__->new(
-    test_query => "select *
+    test_query => q{select *
                     from chart c
                    where charttype = 'A'
                      and 0 = (select count(*)
                             from chart cn
                            where cn.charttype = 'H'
-                             and cn.accno < c.accno)",
-    display_name => $locale->text('Accounts without heading'),
+                             and cn.accno < c.accno)},
+    display_name => marktext('Accounts without heading'),
     name => 'no_header_accounts',
     display_cols => ['accno', 'description', 'link'],
- instructions => $locale->text(
+ instructions => marktext(
                    'Please go into the SQL-Ledger UI and create/rename a
 heading which sorts alphanumerically before the first account by accno'),
     table => 'chart',
@@ -517,34 +665,163 @@ heading which sorts alphanumerically before the first account by accno'),
     );
 
 push @tests,__PACKAGE__->new(
-    test_query => "select *
+    test_query => 'select *
                     from customer
-                   where customernumber is null",
-    display_name => $locale->text('Empty customernumbers'),
+                   where customernumber is null',
+    display_name => marktext('Empty customernumbers'),
     name => 'no_empty_customernumbers',
     display_cols => ['id', 'customernumber', 'name'],
- instructions => $locale->text(
+ instructions => marktext(
                    'Please make sure there are no empty customer numbers.'),
-    column => 'customernumber',
+   columns => ['customernumber'],
     table => 'customer',
     appname => 'sql-ledger',
     min_version => '2.7',
     max_version => '3.0'
     );
 
+    push @tests,__PACKAGE__->new(
+        test_query => q{select id, 'auto-business-' || id as description, 0 as discount from (
+                          select distinct id from (
+                                    select business_id as id from customer
+                              union select business_id from vendor
+                          ) a
+                           where id is not null
+                             and id <> 0
+                             and id not in (select id from business)
+                        order by id
+                      ) a},
+      display_name => marktext('Empty businesses'),
+              name => 'no_businesses',
+      display_cols => ['id', 'description', 'discount'],
+      instructions => marktext(
+                       'Undefined businesses.<br>
+Please make sure business used by vendors and constomers are defined.<br>
+<i><b>Hover on buttons</b> to see their effects and impacts</i>'),
+           columns => ['description', 'discount'],
+             table => 'business',
+           appname => 'sql-ledger',
+       min_version => '2.7',
+       max_version => '3.0',
+            insert => 1,
+            # They should be constrained
+           buttons => ['Save and Retry', 'Cancel', 'Force'],
+     force_queries => ['UPDATE customer SET business_id = NULL
+                         WHERE business_id NOT IN (
+                            SELECT id FROM business);
+                        UPDATE vendor SET business_id = NULL
+                         WHERE business_id NOT IN (
+                            SELECT id FROM business);'],
+          tooltips => {
+            'Force' => marktext('This will <b>remove</b> the business references in <u>vendor</u> and <u>customer</u> tables')
+          }
+        );
+
+
+push @tests, __PACKAGE__->new(
+    test_query => 'SELECT id, name, business_id
+                     FROM vendor
+                    WHERE business_id NOT IN (SELECT id
+                     FROM business)
+                      AND business_id <> 0
+                 ORDER BY name',
+    display_name => marktext('Vendor not in a business'),
+    name => 'no_business_for_vendor',
+    display_cols => ['id', 'name', 'business_id'],
+    columns => ['business_id'],
+ instructions => marktext(
+                   'LedgerSMB vendors must be assigned to a valid business.<br>
+Please review the selection or select the proper business from the list'),
+selectable_values => { business_id => q{SELECT concat(description,' -- ',discount) AS text, id as value
+                                        FROM business
+                                        ORDER BY id}},
+    table => 'vendor',
+    appname => 'sql-ledger',
+    min_version => '2.7',
+    max_version => '3.0'
+    );
+
+push @tests, __PACKAGE__->new(
+    test_query => 'SELECT id, name, business_id
+                     FROM customer
+                    WHERE business_id NOT IN (SELECT id
+                                              FROM business)
+                      AND business_id <> 0
+                 ORDER BY name',
+    display_name => marktext('Customer not in a business'),
+    name => 'no_business_for_customer',
+    display_cols => ['id', 'name', 'business_id'],
+    columns => ['business_id'],
+ instructions => marktext(
+                   'LedgerSMB customers must be assigned to a valid business.<br>
+Please review the selection or select the proper business from the list'),
+selectable_values => { business_id => q{SELECT concat(description,' -- ',discount) AS text, id as value
+                                        FROM business
+                                        ORDER BY id}},
+    table => 'customer',
+    appname => 'sql-ledger',
+    min_version => '2.7',
+    max_version => '3.0'
+    );
+
+push @tests, __PACKAGE__->new(
+    test_query => 'SELECT id, name, business_id
+                     FROM vendor
+                    WHERE business_id NOT IN (SELECT id
+                     FROM business)
+                      AND business_id <> 0
+                 ORDER BY name',
+    display_name => marktext('Vendor not in a business'),
+    name => 'no_business_for_vendor',
+    display_cols => ['id', 'name', 'business_id'],
+    columns => ['business_id'],
+ instructions => marktext(
+                   'LedgerSMB vendors must be assigned to a valid business.<br>
+Please review the selection or select the proper business from the list'),
+selectable_values => { business_id => q{SELECT concat(description,' -- ',discount) AS text, id as value
+                                        FROM business
+                                        ORDER BY id}},
+    table => 'vendor',
+    appname => 'sql-ledger',
+    min_version => '2.7',
+    max_version => '3.0'
+    );
+
+push @tests, __PACKAGE__->new(
+    test_query => 'SELECT id, name, business_id
+                     FROM customer
+                    WHERE business_id NOT IN (SELECT id
+                                              FROM business)
+                      AND business_id <> 0
+                 ORDER BY name',
+    display_name => marktext('Customer not in a business'),
+    name => 'no_business_for_customer',
+    display_cols => ['id', 'name', 'business_id'],
+    columns => ['business_id'],
+ instructions => marktext(
+                   'LedgerSMB customers must be assigned to a valid business.<br>
+Please review the selection or select the proper business from the list'),
+selectable_values => { business_id => q{SELECT concat(description,' -- ',discount) AS text, id as value
+                                        FROM business
+                                        ORDER BY id}},
+    table => 'customer',
+    appname => 'sql-ledger',
+    min_version => '2.7',
+    max_version => '3.0'
+    );
 
 push @tests,__PACKAGE__->new(
-    test_query => "select *
+    test_query => q{ select *
                     from chart
                    where charttype = 'A'
-                     and category not in ('A', 'L', 'Q', 'I', 'E')",
-    display_name => $locale->text('Unsupported account categories'),
+                     and category not in ('A', 'L', 'Q', 'I', 'E')},
+    display_name => marktext('Unsupported account categories'),
     name => 'unsupported_account_types',
     display_cols => ['category', 'accno', 'description'],
- instructions => $locale->text(
+ instructions => marktext(
                    'Please make sure all accounts have a category of
 (A)sset, (L)iability, e(Q)uity, (I)ncome or (E)xpense.'),
-    column => 'category',
+   columns => ['category'],
     table => 'chart',
     appname => 'sql-ledger',
     min_version => '2.7',
@@ -556,14 +833,14 @@ push @tests,__PACKAGE__->new(
 #                     from chart
 #                    where charttype = 'A'
 #                      and link ~ ':?\\(AR|AP|IC\\)\\(:|$\\)'",
-#     display_name => $locale->text('Unsupported account link combinations'),
+#     display_name => marktext('Unsupported account link combinations'),
 #     name => 'unsupported_account_links',
 #     display_cols => ['accno', 'description', 'link'],
-#  instructions => $locale->text(
-#                    'An account can either be a summary account (which have a
+#  instructions =>
+#          marktext( 'An account can either be a summary account (which have a
 # link of "AR", "AP" or "IC" value) or be linked to dropdowns (having any
 # number of "AR_*", "AP_*" and/or "IC_*" links concatenated by colons (:).'),
-#     column => 'category',
+#    columns => ['category'],
 #     table => 'chart',
 #     appname => 'sql-ledger',
 #     min_version => '2.7',
@@ -571,17 +848,17 @@ push @tests,__PACKAGE__->new(
 #     );
 
 push @tests,__PACKAGE__->new(
-    test_query => "select *
+    test_query => q{select *
                     from chart c
                    where charttype = 'A'
                      and 0 = (select count(*)
                             from chart cn
                            where cn.charttype = 'H'
-                             and cn.accno < c.accno)",
-    display_name => $locale->text('Accounts without heading'),
+                             and cn.accno < c.accno)},
+    display_name => marktext('Accounts without heading'),
     name => 'no_header_accounts',
     display_cols => ['accno', 'description', 'link'],
- instructions => $locale->text(
+ instructions => marktext(
                    'Please go into the SQL-Ledger UI and create/rename a
 heading which sorts alphanumerically before the first account by accno'),
     table => 'chart',
@@ -591,19 +868,19 @@ heading which sorts alphanumerically before the first account by accno'),
     );
 
 push @tests,__PACKAGE__->new(
-    test_query => "select *
+    test_query => 'select *
                     from customer
                    where customernumber in (select customernumber
                                               from customer
                                              group by customernumber
                                              having count(*) > 1)
-                    order by customernumber",
-    display_name => $locale->text('Double customernumbers'),
+                    order by customernumber',
+    display_name => marktext('Double customernumbers'),
     name => 'no_double_customernumbers',
     display_cols => ['id', 'customernumber', 'name'],
- instructions => $locale->text(
+ instructions => marktext(
                    'Please make all customer numbers unique'),
-    column => 'customernumber',
+   columns => ['customernumber'],
     table => 'customer',
     appname => 'sql-ledger',
     min_version => '2.7',
@@ -611,15 +888,15 @@ push @tests,__PACKAGE__->new(
     );
 
 push @tests,__PACKAGE__->new(
-    test_query => "select *
+    test_query => 'select *
                     from vendor
-                   where vendornumber is null",
-    display_name => $locale->text('Empty vendornumbers'),
+                   where vendornumber is null',
+    display_name => marktext('Empty vendornumbers'),
     name => 'no_empty_vendornumbers',
     display_cols => ['id', 'vendornumber', 'name'],
- instructions => $locale->text(
+ instructions => marktext(
                    'Please make sure there are no empty vendor numbers.'),
-    column => 'vendornumber',
+   columns => ['vendornumber'],
     table => 'vendor',
     appname => 'sql-ledger',
     min_version => '2.7',
@@ -627,18 +904,18 @@ push @tests,__PACKAGE__->new(
     );
 
 push @tests,__PACKAGE__->new(
-    test_query => "select *
+    test_query => 'select *
                     from vendor
                    where vendornumber in (select vendornumber
                                               from vendor
                                              group by vendornumber
-                                             having count(*) > 1)",
-    display_name => $locale->text('Double vendornumbers'),
+                                             having count(*) > 1)',
+    display_name => marktext('Double vendornumbers'),
     name => 'no_double_vendornumbers',
     display_cols => ['id', 'vendornumber', 'name'],
- instructions => $locale->text(
+ instructions => marktext(
                    'Please make all vendor numbers unique'),
-    column => 'vendornumber',
+   columns => ['vendornumber'],
     table => 'vendor',
     appname => 'sql-ledger',
     min_version => '2.7',
@@ -646,15 +923,15 @@ push @tests,__PACKAGE__->new(
     );
 
 push @tests, __PACKAGE__->new(
-    test_query => "select *
+    test_query => 'select *
                      from employee
-                    where employeenumber is null",
-    display_name => $locale->text('Null employee numbers'),
+                    where employeenumber is null',
+    display_name => marktext('Null employee numbers'),
     name => 'no_null_employeenumbers',
     display_cols => ['id', 'login', 'name', 'employeenumber'],
- instructions => $locale->text(
+ instructions => marktext(
                    'Please make sure all employees have an employee number'),
-    column => 'employeenumber',
+   columns => ['employeenumber'],
     table => 'employee',
     appname => 'sql-ledger',
     min_version => '2.7',
@@ -662,17 +939,17 @@ push @tests, __PACKAGE__->new(
     );
 
 push @tests, __PACKAGE__->new(
-    test_query => "select *
+    test_query => 'select *
                      from employee
                     where employeenumber in (select employeenumber
                                                from employee
                                               group by employeenumber
-                                              having count(*) > 1)",
-    display_name => $locale->text('Null employee numbers'),
+                                              having count(*) > 1)',
+    display_name => marktext('Null employee numbers'),
     name => 'no_duplicate_employeenumbers',
     display_cols => ['id', 'login', 'name', 'employeenumber'],
-    column => 'employeenumber',
- instructions => $locale->text(
+   columns => ['employeenumber'],
+ instructions => marktext(
                    'Please make all employee numbers unique'),
     table => 'employee',
     appname => 'sql-ledger',
@@ -681,19 +958,19 @@ push @tests, __PACKAGE__->new(
     );
 
 push @tests, __PACKAGE__->new(
-    test_query => "select *
+    test_query => 'select *
                      from ar
                     where invnumber in (select invnumber
                                           from ar
                                          group by invnumber
                                          having count(*) > 1)
-                   order by invnumber",
-    display_name => $locale->text('Non-unique invoice numbers'),
+                   order by invnumber',
+    display_name => marktext('Non-unique invoice numbers'),
     name => 'no_duplicate_ar_invoicenumbers',
     display_cols => ['id', 'invnumber', 'transdate', 'duedate', 'datepaid',
                      'ordnumber', 'quonumber', 'approved'],
-    column => 'invnumber',
- instructions => $locale->text(
+   columns => ['invnumber'],
+ instructions => marktext(
                    'Please make all AR invoice numbers unique'),
     table => 'ar',
     appname => 'sql-ledger',
@@ -703,20 +980,21 @@ push @tests, __PACKAGE__->new(
 
 # There's no AP uniqueness requirement?
 push @tests, __PACKAGE__->new(
-    test_query => "select *
-                     from ap
-                    where invnumber in (select invnumber
-                                               from ap
-                                              group by invnumber
-                                              having count(*) > 1)
-                    order by invnumber",
-    display_name => $locale->text('Non-unique invoice numbers'),
+    test_query => q{SELECT id, concat(invnumber,'-',row_number() over(partition by invnumber order by id)) AS invnumber,
+                          dcn, description, transdate, duedate, datepaid, ordnumber, quonumber, approved
+                     FROM ap
+                    WHERE invnumber IN (SELECT invnumber
+                                          FROM ap
+                                      GROUP BY invnumber
+                                        HAVING count(*) > 1)
+                 ORDER BY invnumber},
+    display_name => marktext('Non-unique invoice numbers detected'),
     name => 'no_duplicate_ap_invoicenumbers',
     display_cols => ['id', 'invnumber', 'transdate', 'duedate', 'datepaid',
                      'ordnumber', 'quonumber', 'approved'],
-    column => 'invnumber',
- instructions => $locale->text(
-                   'Please make all AP invoice numbers unique'),
+   columns => ['invnumber'],
+ instructions => marktext(
+                   'Contrary to SQL-ledger, LedgerSMB invoices numbers must be unique. Please review suggestions to make all AP invoice numbers unique. Conflicting entries are presented by pairs, with a suffix added to the invoice number'),
     table => 'ap',
     appname => 'sql-ledger',
     min_version => '2.7',
@@ -724,18 +1002,18 @@ push @tests, __PACKAGE__->new(
     );
 
 push @tests, __PACKAGE__->new(
-   test_query => "select * from parts where obsolete is not true
+   test_query => 'select * from parts where obsolete is not true
                   and partnumber in
                   (select partnumber from parts
                   WHERE obsolete is not true
                   group by partnumber having count(*) > 1)
-                  order by partnumber",
+                  order by partnumber',
          name => 'duplicate_partnumbers',
- display_name => $locale->text('Unique nonobsolete partnumbers'),
- instructions => $locale->text(
+ display_name => marktext('Unique nonobsolete partnumbers'),
+ instructions => marktext(
                    'Make non-obsolete partnumbers unique'),
  display_cols => ['partnumber', 'description', 'sellprice'],
-       column => 'partnumber',
+      columns => ['partnumber'],
         table => 'parts',
       appname => 'sql-ledger',
   min_version => '2.7',
@@ -744,15 +1022,15 @@ push @tests, __PACKAGE__->new(
 
 
 push @tests, __PACKAGE__->new(
-    test_query => "select *
+    test_query => 'select *
                      from makemodel
-                    where model is null",
-    display_name => $locale->text('Null model numbers'),
+                    where model is null',
+    display_name => marktext('Null model numbers'),
     name => 'no_null_modelnumbers',
     display_cols => ['parts_id', 'make', 'model'],
- instructions => $locale->text(
+ instructions => marktext(
                    'Please make sure all modelsnumbers are non-empty'),
-    column => 'model',
+   columns => ['model'],
     table => 'makemodel',
     appname => 'sql-ledger',
     min_version => '2.7',
@@ -761,14 +1039,14 @@ push @tests, __PACKAGE__->new(
 
 
 push @tests, __PACKAGE__->new(
-    test_query => "select *
+    test_query => 'select *
                      from makemodel
-                    where make is null",
-    display_name => $locale->text('Null make numbers'),
+                    where make is null',
+    display_name => marktext('Null make numbers'),
     name => 'no_null_makenumbers',
     display_cols => ['parts_id', 'make', 'model'],
-    column => 'make',
-    instructions => $locale->text(
+   columns => ['make'],
+    instructions => marktext(
                    'Please make sure all make numbers are non-empty'),
     table => 'makemodel',
     appname => 'sql-ledger',
@@ -778,16 +1056,16 @@ push @tests, __PACKAGE__->new(
 
 
 push @tests, __PACKAGE__->new(
-    test_query => "select *
+    test_query => 'select *
                      from partscustomer
                     where not exists (select 1
                                         from pricegroup
                                        where id = pricegroup_id)
-                                        and pricegroup_id <> 0",
-    display_name => $locale->text('Non-existing customer pricegroups in partscustomer'),
+                                        and pricegroup_id <> 0',
+    display_name => marktext('Non-existing customer pricegroups in partscustomer'),
     name => 'partscustomer_pricegroups_exist',
     display_cols => ['parts_id', 'credit_id', 'pricegroup_id'],
- instructions => $locale->text(
+ instructions => marktext(
                    'Please fix the pricegroup data in your partscustomer table (no UI available)'),
     table => 'partscustomer',
     appname => 'sql-ledger',
@@ -796,14 +1074,14 @@ push @tests, __PACKAGE__->new(
     );
 
 push @tests, __PACKAGE__->new(
-    test_query => "select *
+    test_query => q{select *
                      from chart
-                    where not charttype in ('H', 'A')",
-    display_name => $locale->text('Unknown charttype; should be H(eader)/A(ccount)'),
+                    where not charttype in ('H', 'A')},
+    display_name => marktext('Unknown charttype; should be H(eader)/A(ccount)'),
     name => 'unknown_charttype',
     display_cols => ['accno', 'charttype', 'description'],
-    column => 'charttype',
- instructions => $locale->text(
+   columns => ['charttype'],
+ instructions => marktext(
                    'Please fix the presented rows to either be "H" or "A"'),
     table => 'chart',
     appname => 'sql-ledger',
@@ -813,15 +1091,15 @@ push @tests, __PACKAGE__->new(
 
 
 push @tests, __PACKAGE__->new(
-    test_query => "select *
+    test_query => q{select *
                      from chart
                     where charttype = 'A'
-                          and category not in ('A','L','E','I','Q')",
-    display_name => $locale->text('Unknown account category (should be A(sset)/L(iability)/E(xpense)/I(ncome)/(e)Q(uity))'),
+                          and category not in ('A','L','E','I','Q')},
+    display_name => marktext('Unknown account category (should be A(sset)/L(iability)/E(xpense)/I(ncome)/(e)Q(uity))'),
     name => 'unknown_account_category',
     display_cols => ['accno', 'category', 'description'],
-    column => 'category',
- instructions => $locale->text(
+   columns => ['category'],
+ instructions => marktext(
                    'Please fix the pricegroup data in your partscustomer table (no UI available)'),
     table => 'chart',
     appname => 'sql-ledger',
@@ -831,14 +1109,14 @@ push @tests, __PACKAGE__->new(
 
 
 push @tests, __PACKAGE__->new(
-    test_query => "select count(*)
+    test_query => q{select count(*)
                      from chart
                     where charttype = 'H'
-                    having count(*) < 1",
-    display_name => $locale->text('Unknown '),
+                    having count(*) < 1},
+    display_name => marktext('Unknown '),
     name => 'no_headers_defined',
     display_cols => ['accno', 'charttype', 'description'],
- instructions => $locale->text(
+ instructions => marktext(
                    'Please add at least one header to your CoA which sorts before all other account numbers (in the standard SL UI)'),
     table => 'chart',
     appname => 'sql-ledger',
@@ -848,16 +1126,16 @@ push @tests, __PACKAGE__->new(
 
 
 push @tests, __PACKAGE__->new(
-    test_query => "select *
+    test_query => q{select *
                      from chart
                     where charttype = 'A'
                           and accno < (select min(accno)
                                         from chart
-                                       where charttype = 'H')",
-    display_name => $locale->text(''),
+                                       where charttype = 'H')},
+    display_name => marktext(''),
     name => 'insufficient_headings',
     display_cols => ['accno', 'description'],
- instructions => $locale->text(
+ instructions => marktext(
                    'Please add a header to the CoA which sorts before the listed accounts (usually "0000" works) (in the standard SL UI)'),
     table => 'chart',
     appname => 'sql-ledger',
@@ -867,17 +1145,17 @@ push @tests, __PACKAGE__->new(
 
 
 push @tests, __PACKAGE__->new(
-    test_query => "select *
+    test_query => 'select *
                      from tax t
                      join chart c on t.chart_id = c.id
                     where c.id in (select chart_id
                                      from tax
                                  group by chart_id, validto
-                                   having count(*) > 1)",
-    display_name => $locale->text(''),
+                                   having count(*) > 1)',
+    display_name => marktext(''),
     name => 'tax_rates_unique_end_dates',
     display_cols => ['accno', 'description', 'validto', 'rate'],
- instructions => $locale->text(
+ instructions => marktext(
                    'Multiple tax rates with the same end date have been detected for a tax account;'),
     table => 'tax',
     appname => 'sql-ledger',
@@ -885,20 +1163,88 @@ push @tests, __PACKAGE__->new(
     max_version => '3.0'
     );
 
+push @tests, __PACKAGE__->new(
+    test_query => q{select concat(ac.trans_id,'-',ac.id) as id,
+                          ap.transdate, ap.datepaid,
+                          ac.cleared-ac.transdate as delay, ap.amount,v.name,
+                          ac.transdate,ac.cleared
+                  from ap
+                  join acc_trans ac on ap.id=ac.trans_id
+                  left join vendor v on v.id=ap.vendor_id
+                  where ((ac.cleared-ac.transdate > 150 or ac.cleared-ac.transdate < 0)
+                         or ac.cleared < ap.datepaid and ac.id = (select max(id) from acc_trans where ap.id=acc_trans.trans_id))
+                    and ac.id > 0
+                  order by ac.cleared,id, ac.transdate, ap.datepaid},
+  display_name => marktext('Invalid or suspect cleared delays'),
+          name => 'invalid_cleared_dates',
+  display_cols => ['name', 'id', 'datepaid', 'transdate', 'cleared', 'delay', 'amount'],
+ instructions => marktext(
+                   'Suspect or invalid cleared delays have been detected. Please review the dates in the original application'),
+      buttons => ['Cancel', 'Skip'],
+     tooltips => {
+          'Skip'  => marktext('This will <b>skip</b> this test <b><u>without doing any correction</u></b>')
+     },
+        table => 'ap',
+      appname => 'sql-ledger',
+  min_version => '2.7',
+  max_version => '3.0'
+);
+
+push @tests, __PACKAGE__->new(
+    test_query => q(SELECT ac.lsmb_entry_id, ac.trans_id, ac.id, ac.chart_id, ac.memo, ac.amount, xx.description,
+                          ch.description as account, ch.accno, ch.link, ch.charttype, ch.category, ac.cleared, approved
+                     FROM acc_trans ac
+                     JOIN (
+                               SELECT g.id, g.description FROM gl g
+                         UNION SELECT a.id, n.name        FROM ar a JOIN customer n ON n.id = a.customer_id
+                         UNION SELECT a.id, n.name        FROM ap a JOIN vendor n   ON n.id = a.vendor_id
+                     ) xx ON xx.id = ac.trans_id
+                     JOIN chart ch ON (ac.chart_id = ch.id)
+                    WHERE ( ch.category NOT IN ( 'A', 'L', 'Q' )
+                         OR ch.link NOT LIKE '%paid' )
+                      AND ac.cleared IS NOT NULL
+                      AND ac.approved
+                 ORDER BY trans_id, ac.id, accno, transdate),
+  display_name => marktext('Unneeded Reconciliations'),
+          name => 'reconciliation_on_unrelated_accounts',
+  display_cols => ['trans_id', 'id', 'memo', 'amount', 'description',
+                   'accno', 'account', 'link', 'category', 'cleared', 'approved'],
+       columns => ['cleared'],
+    id_columns => ['lsmb_entry_id'],
+  instructions => marktext(
+                   'Reconciliations should be on asset, liability or equity accounts only.<br>
+Void the clearing date in the dialog shown or go back to SQL-Ledger if you feel that you need to adjust more before migrating.'),
+           buttons => ['Save and Retry', 'Cancel', 'Force', 'Skip'],
+          tooltips => {
+               'Force' => marktext('This will <b>keep</b> the transactions but will <b>ignore</b> the non-necessary reconciliations'),
+               'Skip'  => marktext('This will <b>skip</b> this test <b><u>without doing any correction</u></b>')
+          },
+     force_queries => [q(UPDATE acc_trans ac SET cleared = NULL
+                         WHERE chart_id in ( SELECT id
+                                               FROM chart c
+                                              WHERE c.category NOT IN ( 'A', 'L' )
+                                                 OR c.link NOT LIKE '%paid' )
+                           AND ac.cleared IS NOT NULL
+                           AND ac.approved;)],
+             table => 'acc_trans',
+           appname => 'sql-ledger',
+       min_version => '2.7',
+       max_version => '3.0'
+);
 
 
- ### On the vendor side, SL doesn't use pricegroups
+### On the vendor side, SL doesn't use pricegroups
 # push @tests, __PACKAGE__->new(
 #     test_query => "select *
 #                      from partsvendor
 #                     where not exists (select 1
 #                                         from pricegroup
 #                                        where id = pricegroup_id)",
-#     display_name => $locale->text('Non-existing vendor pricegroups in partsvendor'),
+#     display_name => marktext('Non-existing vendor pricegroups in partsvendor'),
 #     name => 'partsvendor_pricegroups_exist',
 #     display_cols => ['parts_id', 'credit_id', 'pricegroup_id'],
-#  instructions => $locale->text(
-#                    'Please fix the pricegroup data in your partsvendor table (no UI available)'),
+#  instructions =>
+#         marktext('Please fix the pricegroup data in your partsvendor table (no UI available)'),
 #     table => 'partsvendor',
 #     appname => 'sql-ledger',
 #     min_version => '2.7',
@@ -908,6 +1254,18 @@ push @tests, __PACKAGE__->new(
     return @tests;
 }
 
+=head1 LICENSE AND COPYRIGHT
+
+Copyright (C) 2012-2018 The LedgerSMB Core Team
+
+This file is licensed under the Gnu General Public License version 2, or at your
+option any later version.  A copy of the license should have been included with
+your software.
+
+=cut
+
+
 __PACKAGE__->meta->make_immutable;
+
 
 1;

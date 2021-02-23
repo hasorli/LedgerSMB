@@ -37,16 +37,20 @@
   }
 
   # default currency
-  currency_defaults = {
-    "data-dojo-type" = 'dijit/form/CurrencyTextBox',
-    "data-dojo-props" = "currency:'$SETTINGS.default_currency'"
-  }
+  # this is a workaround for https://github.com/ledgersmb/LedgerSMB/issues/2270
+  currency_defaults = text_defaults
+#  currency_defaults = {
+#    "data-dojo-type" = 'dijit/form/CurrencyTextBox',
+#    "data-dojo-props" = "currency:'$SETTINGS.default_currency'"
+#  }
 
   # default monetary (currency without currency indicator)
-  monetary_defaults = {
-    "data-dojo-type" = 'dijit/form/NumberTextBox',
-    "data-dojo-props" = "constraints:{pattern:'0.00'}"
-  }
+  # this is a workaround for https://github.com/ledgersmb/LedgerSMB/issues/2270
+  monetary_defaults = text_defaults
+#  monetary_defaults = {
+#    "data-dojo-type" = 'dijit/form/NumberTextBox',
+#    "data-dojo-props" = "constraints:{pattern:'0.00'}"
+#  }
 
   # date
   USER.dojo_dateformat = USER.dateformat.replace('mm','MM');
@@ -71,6 +75,12 @@
   #select
   select_defaults = {
     "data-dojo-type" = "dijit/form/Select"
+  }
+
+  #multiselect
+  multiselect_defaults = {
+    "data-dojo-type" = "dijit/form/MultiSelect"
+    "multiple" = "true"
   }
 
   #toggle
@@ -223,8 +233,11 @@
           ?>
           <?lsmb PROCESS attributes  # Process regular attributes.
             attribute_data=element_data
-            attribute_defaults = select_defaults
-            # Attributes that apply to selects.
+            attribute_defaults =
+                (element_data.type.defined() && element_data.type == "multiselect")
+                ? multiselect_defaults
+                : select_defaults
+            # Attributes that apply to selects and multiselect.
             element_keys=['name', 'size', 'multiple', 'disabled', 'accesskey',
             'tabindex', 'required', 'data-dojo-type', 'data-dojo-props']
           ?>
@@ -290,6 +303,13 @@
           ?>
           <?lsmb PROCESS auto_label  # Process element label. ?>
           <button<?lsmb all_attributes ?><?lsmb all_custom_attributes ?>><?lsmb element_data.text ?></button>
+          <?lsmb IF element_data.tooltip.msg;
+                INCLUDE tooltip element_data = {
+                id       => element_data.tooltip.id,
+                ref_id   => element_data.id,
+                position => element_data.tooltip.position,
+                msg      => element_data.tooltip.msg };
+          END ?>
   <?lsmb END ?>
 <?lsmb END ?>
 
@@ -418,8 +438,29 @@
 
 <?lsmb BLOCK CLOSE_STATUS_DIV ?></div><?lsmb END ?>
 
-<?lsmb BLOCK tooltip; ?>
-  <?lsmb IF element_data && element_data.id.defined() && element_data.msg.defined(); ?>
-    <div data-dojo-type="dijit/Tooltip" data-dojo-props="connectId:<?lsmb element_data.id ?>" ><?lsmb element_data.msg ?></div>
-  <?lsmb END ?>
-<?lsmb END ?>
+<?lsmb BLOCK decorated_text;
+  IF element_data && element_data.msg.defined();
+    element_data.msg.replace('&lt;((/?[ibup]|br))&gt;','<$1>');
+  END;
+END ?>
+
+<?lsmb BLOCK tooltip;
+  IF element_data && element_data.msg.defined();
+     props="\"connectId:'" _ element_data.ref_id _ "'";
+     IF element_data.position.defined();
+        positions = [];
+        FOREACH position IN element_data.position
+            "<!-- == $position == -->"; # Prevent loop variable optimization
+            positions.push("'$position'");
+        END;
+        props = props _ ',position:[' _ positions.join(',') _ ']';
+    END;
+    props = props _ '"';
+    ?>
+    <div data-dojo-type="dijit/Tooltip" data-dojo-props=<?lsmb props ?>  >
+         <?lsmb INCLUDE decorated_text element_data = {
+                msg => element_data.msg };
+         ?>
+    </div>
+  <?lsmb END;
+END ?>

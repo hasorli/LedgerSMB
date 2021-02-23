@@ -1,6 +1,15 @@
+
+package LedgerSMB::Entity::Person::Employee;
+
 =head1 NAME
 
 LedgerSMB::Entity::Person::Employee -- Employee handling for LedgerSMB
+
+=head1 DESCRIPTION
+
+Derived from C<LedgerSMB::Entity::Person>, this class adds
+"employee attributes" such as start and end dates, HR hierarchy (manager)
+and organisational funcion/role name.
 
 =head1 SYNOPSIS
 
@@ -28,9 +37,10 @@ To get by control code:
 
 =cut
 
-package LedgerSMB::Entity::Person::Employee;
 use Moose;
+use namespace::autoclean;
 use LedgerSMB::Entity::Person;
+use LedgerSMB::Magic qw( EC_EMPLOYEE );
 extends 'LedgerSMB::Entity::Person';
 
 use LedgerSMB::App_State;
@@ -140,7 +150,7 @@ sub get {
     my ($ref) = __PACKAGE__->call_procedure(funcname => 'employee__get',
                                           args => [$id]);
     return undef unless $ref->{control_code};
-    $ref->{entity_class} = 3;
+    $ref->{entity_class} = EC_EMPLOYEE;
     $ref->{name} = "$ref->{first_name} $ref->{last_name}";
     return __PACKAGE__->new(%$ref);
 }
@@ -171,12 +181,12 @@ sub save {
     my ($ref) = $self->call_dbmethod(funcname => 'person__save');
     my ($id) = values(%$ref);
     $self->entity_id($id);
-    $self->call_dbmethod(funcname => 'employee__save');
+    return $self->call_dbmethod(funcname => 'employee__save');
 }
 
 =back
 
-=head1 COPYRIGHT
+=head1 LICENSE AND COPYRIGHT
 
 Copyright (C) 2012, the LedgerSMB Core Team.  This file may be re-used under
 the GNU GPL version 2 or at your option any future version.  Please see the

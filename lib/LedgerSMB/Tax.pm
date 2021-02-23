@@ -1,22 +1,22 @@
+
+package Tax;
+
 =head1 NAME
+
 LedgerSMB::Tax - Basic tax infrastructure for LedgerSMB
-#
-#======================================================================
-#
-# apply_taxes - applies taxes to the given subtotal
-# extract_taxes - extracts taxes from the given total
-# initialize_taxes - loads taxes from the database
-# calculate_taxes - calculates taxes
-#
-#====================================================================
+
+=head1 DESCRIPTION
+
+apply_taxes - applies taxes to the given subtotal
+extract_taxes - extracts taxes from the given total
+initialize_taxes - loads taxes from the database
+calculate_taxes - calculates taxes
 
 =head2 SYNOPSIS
 
   @taxes = LedgerSMB::Tax->init_taxes($request, $taxlist1, $taxlist2)
 
 =cut
-
-package Tax;
 
 use LedgerSMB::PGNumber;
 use Log::Log4perl;
@@ -26,6 +26,10 @@ use warnings;
 
 
 my $logger = Log::Log4perl->get_logger('Tax');
+
+=head1 METHODS
+
+This module doesn't specify any (public) methods.
 
 =head1 FUNCTIONS
 
@@ -47,7 +51,7 @@ sub init_taxes {
     my @accounts = split / /, $taxaccounts;
     if ( defined $taxaccounts2 ) {
         #my @tmpaccounts = @accounts;#unused var
-        $#accounts = -1;# empty @accounts,@accounts=();
+        @accounts=(); # empty @accounts
         for my $acct ( split / /, $taxaccounts2 ) {
             if ( $taxaccounts =~ /\b$acct\b/ ) {
                 push @accounts, $acct;
@@ -55,9 +59,9 @@ sub init_taxes {
         }
     }
     else{
-     $logger->trace("taxaccounts2 undefined");
+     $logger->trace('taxaccounts2 undefined');
     }
-    my $query = qq|
+    my $query = q{
         SELECT t.taxnumber, c.description,
             t.rate, t.chart_id, t.pass, m.taxmodulename, t.minvalue
             FROM tax t INNER JOIN account c ON (t.chart_id = c.id)
@@ -68,7 +72,7 @@ sub init_taxes {
                           >= coalesce(?::timestamp, now())
             ORDER BY validto ASC
             LIMIT 1
-        |;
+        };
     my $sth = $dbh->prepare($query);
     foreach my $taxaccount (@accounts) {
         next if ( !defined $taxaccount );
@@ -87,14 +91,8 @@ sub init_taxes {
 
         my $module = "LedgerSMB/Taxes/$ref->{taxmodulename}.pm";
         require $module;
-        $module = $ref->{taxmodulename};
-        $module =~ s/\//::/g;
-        my $tax;
-        {
-          no strict 'refs';
-          $tax = "LedgerSMB::Taxes::$module"->new(%$ref);
-        }
 
+        my $tax = "LedgerSMB::Taxes::$ref->{taxmodulename}"->new(%$ref);
         $tax->account($taxaccount);
         $tax->taxnumber( $ref->{'taxnumber'} );
         $tax->value( 0 );
@@ -142,7 +140,7 @@ sub calculate_taxes {
 
 =head2 apply_taxes
 
-A shortcut for calculating taxes without extracting (i.e. when taxes not 
+A shortcut for calculating taxes without extracting (i.e. when taxes not
 included)
 
 =head2 extract_taxes
@@ -163,7 +161,7 @@ sub extract_taxes {
 
 1;
 
-=head1 COPYRIGHT
+=head1 LICENSE AND COPYRIGHT
 
 The original copyright notice follows:
 

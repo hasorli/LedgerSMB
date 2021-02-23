@@ -5,7 +5,7 @@
 
 use strict;
 use warnings;
-use Test::More 'no_plan';
+use Test::More;
 use Math::BigFloat;
 
 use LedgerSMB::Sysconfig;
@@ -21,13 +21,13 @@ $ENV{REQUEST_METHOD} = 'GET';
      # Suppress warnings from LedgerSMB::_process_cookies
 
 
-my $form = new Form;
+my $form = Form->new;
 my $locale_en = LedgerSMB::Locale->get_handle('en_CA');
 my $locale_es = LedgerSMB::Locale->get_handle('es');
 my %myconfig;
 ok(defined $form);
 isa_ok($form, 'Form');
-my $lsmb = new LedgerSMB;
+my $lsmb = LedgerSMB->new;
 ok(defined $lsmb);
 isa_ok($lsmb, 'LedgerSMB');
 
@@ -82,9 +82,9 @@ foreach my $format (0 .. $#formats) {
         for my $mm (1 .. 12) {
                 my $start = $fmt;
                 my $temp = sprintf('%02d', $mm);
-                my $month_en = $locale_en->text($months[$mm - 1]);
-                my $month_en_2 = $locale_en->text($mon[$mm - 1]);
-                my $month_es = $locale_es->text($months[$mm - 1]);
+                my $month_en = $locale_en->maketext($months[$mm - 1]);
+                my $month_en_2 = $locale_en->maketext($mon[$mm - 1]);
+                my $month_es = $locale_es->maketext($months[$mm - 1]);
                 $start =~ s/dd/29/;
                 $start =~ s/yyyy/2000/;
                 $start =~ s/yy/00/;
@@ -336,5 +336,61 @@ is(LedgerSMB::PGDate->from_input(undef)->to_output, '',
 is(LedgerSMB::PGDate->from_input('2016-01-01')->to_output, '2016-01-01',
    'round-tripping valid ISO-8601 date returns that date');
 
+foreach my $test (
+    {
+        format => 'dd/mm/yyyy',
+        date => '29/10/2016',
+    },
+    {
+        format => 'dd.mm.yyyy',
+        date => '29.10.2016',
+    },
+    {
+        format => 'dd-mm-yyyy',
+        date => '29-10-2016',
+    },
+    {
+        format => 'ddmmyyyy',
+        date => '29102016',
+    },
+    {
+        format => 'ddmmyy',
+        date => '291016',
+    },
+    {
+        format => 'mm/dd/yyyy',
+        date => '10/29/2016',
+    },
+    {
+        format => 'mm.dd.yyyy',
+        date => '10.29.2016',
+    },
+    {
+        format => 'mm-dd-yyyy',
+        date => '10-29-2016',
+    },
+    {
+        format => 'mmddyyyy',
+        date => '10292016',
+    },
+    {
+        format => 'mmddyy',
+        date => '102916',
+    },
+    {
+        format => 'yyyymmdd',
+        date => '20161029',
+    },
+    {
+        format => 'yymmdd',
+        date => '161029',
+    },
+) {
+   $LedgerSMB::App_State::User = { dateformat => $test->{format} };
+   is(eval { LedgerSMB::PGDate->from_input($test->{date})->to_output },
+      $test->{date},
+      "round-tripping valid '$test->{format}' date returns that date");
+}
 
 
+done_testing;

@@ -2,7 +2,7 @@
 
 use strict;
 use warnings;
-use Test::More tests => 208;
+use Test::More;
 use File::Find;
 
 my @on_disk;
@@ -27,12 +27,12 @@ my @exception_modules =
      # Exclude because tested conditionally on XML::Twig way below
      'LedgerSMB::Template::ODS',
 
-     # Exclude because tested conditionally on XML::Simple way below
-     'LedgerSMB::REST_Format::xml',
+     # Exclude because tested conditionally on Excel::Writer::XLSX
+     # and Spreadsheet::WriteExcel
+     'LedgerSMB::Template::XLSX',
 
      # Exclude because tested conditionally on CGI::Emulate::PSGI way below
      'LedgerSMB::PSGI',
-
      # Exclude because tested conditionally on X12::Parser way below
      'LedgerSMB::X12', 'LedgerSMB::X12::EDI850', 'LedgerSMB::X12::EDI894',
 
@@ -50,24 +50,25 @@ my @modules =
     (
           'LedgerSMB::App_State',
           'LedgerSMB::DBH', 'LedgerSMB::I18N',
-          'LedgerSMB::Locale', 'LedgerSMB::Mailer', 'LedgerSMB::Session',
+          'LedgerSMB::Locale', 'LedgerSMB::Mailer',
           'LedgerSMB::User', 'LedgerSMB::Entity',
-          'LedgerSMB::GL', 'LedgerSMB::Group', 'LedgerSMB::Timecard',
+          'LedgerSMB::GL', 'LedgerSMB::Timecard',
           'LedgerSMB::PE', 'LedgerSMB::App_Module', 'LedgerSMB::Budget',
           'LedgerSMB::Business_Unit', 'LedgerSMB::Business_Unit_Class',
           'LedgerSMB::MooseTypes', 'LedgerSMB::PriceMatrix',
           'LedgerSMB::File', 'LedgerSMB::Report',
-          'LedgerSMB::Template', 'LedgerSMB::Company_Config',
-          'LedgerSMB::Contact', 'LedgerSMB::Database',
+          'LedgerSMB::Template', 'LedgerSMB::Legacy_Util',
+          'LedgerSMB::Company_Config', 'LedgerSMB::Database',
+          'LedgerSMB::Database::ChangeChecks',
           'LedgerSMB::PGObject', 'LedgerSMB::Auth',
           'LedgerSMB::AA', 'LedgerSMB::AM', 'LedgerSMB::Batch',
           'LedgerSMB::IC', 'LedgerSMB::IR', 'LedgerSMB::PGDate',
-          'LedgerSMB::PGNumber', 'LedgerSMB::PGOld', 'LedgerSMB::Request',
+          'LedgerSMB::PGNumber', 'LedgerSMB::PGOld',
           'LedgerSMB::Setting', 'LedgerSMB::Tax', 'LedgerSMB::Upgrade_Tests',
-          'LedgerSMB::Form', 'LedgerSMB::IS',
+          'LedgerSMB::Upgrade_Preparation', 'LedgerSMB::Form', 'LedgerSMB::IS',
           'LedgerSMB::Num2text', 'LedgerSMB::OE', 'LedgerSMB::Auth::DB',
           'LedgerSMB::DBObject::Asset_Class', 'LedgerSMB::DBObject::Draft',
-          'LedgerSMB::DBObject::EOY', 'LedgerSMB::DBObject::Part',
+          'LedgerSMB::DBObject::EOY',
           'LedgerSMB::DBObject::Pricelist', 'LedgerSMB::DBObject::TaxForm',
           'LedgerSMB::DBObject::TransTemplate', 'LedgerSMB::DBObject::Menu',
           'LedgerSMB::DBObject::User', 'LedgerSMB::DBObject::Account',
@@ -90,11 +91,16 @@ my @modules =
           'LedgerSMB::File::Transaction',
           'LedgerSMB::Inventory::Adjust',
           'LedgerSMB::Inventory::Adjust_Line',
+          'LedgerSMB::Middleware::AuthenticateSession',
+          'LedgerSMB::Middleware::ClearDownloadCookie',
+          'LedgerSMB::Middleware::DisableBackButton',
+          'LedgerSMB::Middleware::DynamicLoadWorkflow',
+          'LedgerSMB::Middleware::Log4perl',
+          'LedgerSMB::Middleware::RequestID',
           'LedgerSMB::old_code', 'LedgerSMB::Part',
           'LedgerSMB::Payroll::Deduction_Type',
           'LedgerSMB::Payroll::Income_Type',
-          'LedgerSMB::PSGI::Preloads',
-          'LedgerSMB::REST_Format::json',
+          'LedgerSMB::PSGI::Preloads', 'LedgerSMB::PSGI::Util',
           'LedgerSMB::Reconciliation::CSV',
           'LedgerSMB::Reconciliation::ISO20022',
           'LedgerSMB::FileFormats::ISO20022::CAMT053',
@@ -168,14 +174,15 @@ my @modules =
           'LedgerSMB::Scripts::drafts', 'LedgerSMB::Scripts::recon',
           'LedgerSMB::Scripts::timecard', 'LedgerSMB::Scripts::vouchers',
           'LedgerSMB::Scripts::employee::country',
-          'LedgerSMB::Setting::Sequence', 'LedgerSMB::Taxes::Simple',
-          'LedgerSMB::Template::Elements', 'LedgerSMB::Template::DBProvider',
-          'LedgerSMB::Template::TTI18N', 'LedgerSMB::Template::TXT',
+          'LedgerSMB::Setting::Sequence',
+          'LedgerSMB::Setup::SchemaChecks',
+          'LedgerSMB::Taxes::Simple',
+          'LedgerSMB::Template::DBProvider',
+          'LedgerSMB::Template::TXT',
           'LedgerSMB::Template::HTML', 'LedgerSMB::Template::CSV',
-          'LedgerSMB::Template::XLS', 'LedgerSMB::Template::XLSX',
           'LedgerSMB::Template::DB', 'LedgerSMB::Timecard::Type',
-          'LedgerSMB::REST_Class::contact', 'LedgerSMB::Request::Error',
           'LedgerSMB::Database::Loadorder', 'LedgerSMB::Database::Change',
+          'LedgerSMB::Magic',
     );
 
 my %modules;
@@ -193,6 +200,8 @@ ok(scalar(@untested_modules) eq 0, 'All on-disk modules are tested')
 
 use_ok('LedgerSMB::Sysconfig')
     || BAIL_OUT('System Configuration could be loaded!');
+my @to_sort = map { rand() } 0 .. $#modules;
+@modules = @modules[ sort { $to_sort[$a] <=> $to_sort[$b] } 0 .. $#modules  ];
 for my $module (@modules) {
     use_ok($module);
 }
@@ -216,13 +225,6 @@ SKIP: {
 }
 
 SKIP: {
-        eval { require XML::Simple };
-
-        skip 'XML::Simple not installed', 1 if $@;
-        use_ok('LedgerSMB::REST_Format::xml');
-}
-
-SKIP: {
         eval { require CGI::Emulate::PSGI };
 
         skip 'CGI::Emulate::PSGI not installed', 1 if $@;
@@ -237,3 +239,18 @@ SKIP: {
         use_ok($_);
     }
 }
+
+SKIP: {
+    eval { require Excel::Writer::XLSX };
+    skip 'Excel::Writer::XLSX not installed', 1 if $@;
+
+
+    eval { require Spreadsheet::WriteExcel };
+    skip 'Spreadsheet::WriteExcel not installed', 1 if $@;
+
+    for ('LedgerSMB::Template::XLSX') {
+        use_ok($_);
+    }
+}
+
+done_testing;

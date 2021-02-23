@@ -1,25 +1,31 @@
-=pod
+
+package LedgerSMB::Scripts::import_csv;
 
 =head1 NAME
 
 LedgerSMB::Scripts::import_csv - web entry points for various csv uploads
 
-=head1 SYNPOSIS
+=head1 DESCRIPTION
 
 This is a module that demonstrates how to set up scripts for importing bulk
 data.
 
+=head1 METHODS
+
+This module doesn't specify any methods.
+
 =cut
 
-package LedgerSMB::Scripts::import_csv;
 use strict;
 use warnings;
 
 use List::MoreUtils qw{ any };
+use Text::CSV;
 
 use LedgerSMB::Template;
 use LedgerSMB::Form;
 use LedgerSMB::Setting;
+use LedgerSMB::Magic qw( EC_VENDOR EC_CUSTOMER );
 
 our $cols = {
    gl       =>  ['accno', 'debit', 'credit', 'source', 'memo'],
@@ -48,21 +54,22 @@ our $postprocess = {};
 sub _inventory_template_setup {
     my ($request) = @_;
     my $sth = $request->{dbh}->prepare(
-        "SELECT concat(accno,'--',description) as value
-             FROM chart_get_ar_ap(?)"
+        q{SELECT concat(accno,'--',description) as value
+             FROM chart_get_ar_ap(?)}
         );
 
-    $sth->execute(1); # AP accounts
+    $sth->execute(EC_VENDOR);
     while (my $row = $sth->fetchrow_hashref('NAME_lc')) {
         push @{$request->{AP_accounts}}, $row;
     }
 
 
-    $sth->execute(2); # AR accounts
+    $sth->execute(EC_CUSTOMER);
     while (my $row = $sth->fetchrow_hashref('NAME_lc')) {
         push @{$request->{AR_accounts}}, $row;
     }
-};
+    return;
+}
 
 
 our $template_setup = {
@@ -99,10 +106,10 @@ sub _aa_multi {
     # Necessary to test things are found before starting to
     # import! -- CT
     my $acst = $request->{dbh}->prepare(
-        "select count(*) from account where accno = ?"
+        'select count(*) from account where accno = ?'
         );
     my $vcst = $request->{dbh}->prepare(
-        "select count(*) from entity_credit_account where meta_number = ?"
+        'select count(*) from entity_credit_account where meta_number = ?'
         );
     for my $ref (@$entries){
         my $pass;
@@ -111,7 +118,7 @@ sub _aa_multi {
         $acst->execute($acct);
         ($pass) = $acst->fetchrow_array;
         $request->error("Account $acct not found") if !$pass;
-        ($acct) = split /--/, $ref->[3];
+        ($acct) = split /--/, $ref->[3];  ## no critic (ProhibitMagicNumbers) sniff
         $acst->execute($acct);
         ($pass) = $acst->fetchrow_array;
         $request->error("Account $acct not found") if !$pass;
@@ -138,7 +145,7 @@ sub _aa_multi {
         $form->{amount_1} = $form->parse_amount(
             $request->{_user}, $form->{amount_1});
         $form->{"$form->{ARAP}_amount_1"} = shift @$ref;
-        $form->{vc} = ($arap eq "ar") ? "customer" : "vendor";
+        $form->{vc} = ($arap eq 'ar') ? 'customer' : 'vendor';
         $form->{arap} = $arap;
         $form->{uc($arap)} = shift @$ref;
         $form->{description_1} = shift @$ref;
@@ -148,8 +155,8 @@ sub _aa_multi {
         $form->{approved} = '0';
         $form->{defaultcurrency} = $default_currency;
         my $sth = $form->{dbh}->prepare(
-            "SELECT id FROM entity_credit_account
-              WHERE entity_class = ? and meta_number = ?"
+            'SELECT id FROM entity_credit_account
+              WHERE entity_class = ? and meta_number = ?'
             );
         $sth->execute( ($arap eq 'ar') ? 2 : 1,
                        uc($form->{vendornumber}));
@@ -159,7 +166,7 @@ sub _aa_multi {
         AA->post_transaction($request->{_user}, $form);
     }
     return 1;
-};
+}
 
 sub _inventory_single_date {
     my ($request, $entries, $report_id, $transdate) = @_;
@@ -183,12 +190,12 @@ sub _inventory_single_date {
     # Intentionally not setting CRDATE here
 
     my $p_info_sth = $dbh->prepare(
-        "SELECT * FROM parts WHERE partnumber = ?"
+        'SELECT * FROM parts WHERE partnumber = ?'
         ) or $ap_form->dberror();
     my $ins_sth = $dbh->prepare(
-        "INSERT INTO inventory_report_line
+        'INSERT INTO inventory_report_line
                 (parts_id, counted, expected, adjust_id)
-             VALUES (?, ?, ?, ?)"
+             VALUES (?, ?, ?, ?)'
         ) or $ap_form->dberror();
 
     my $adjustment = ($request->{stock_type} ne 'relative') ?
@@ -237,20 +244,20 @@ sub _inventory_single_date {
     IS->post_invoice(undef, $ar_form) if $ar_form->{rowcount};
     IR->post_invoice(undef, $ap_form) if $ap_form->{rowcount};
 
-    $ar_form->{id} = "NULL"
+    $ar_form->{id} = 'NULL'
         if ! $ar_form->{id};
-    $ap_form->{id} = "NULL"
+    $ap_form->{id} = 'NULL'
         if ! $ap_form->{id};
 
     # Now, update the report record.
-    $dbh->do( # These two params come from posting above, and from
+    return ($dbh->do( # These two params come from posting above, and from
               # the db.
               "UPDATE inventory_report
                        SET ar_trans_id = $ar_form->{id},
                            ap_trans_id = $ap_form->{id}
                      WHERE id = $report_id"
-        ) or $ap_form->dberror();
-};
+        ) or $ap_form->dberror());
+}
 
 sub _process_ar_multi {
     my  ($request, $entries) = @_;
@@ -287,13 +294,13 @@ sub _process_gl {
                 $request->{_user}, $ref->[2]
                 );
         }
-        next if !$ref->[1] and !$ref->[2];
+        next if not $ref->[1] and not $ref->[2];
         for my $col (@{$cols->{$request->{type}}}){
             $form->{"${col}_$form->{rowcount}"} = shift @$ref;
         }
         ++$form->{rowcount};
     }
-    GL->post_transaction($request->{_user}, $form,
+    return GL->post_transaction($request->{_user}, $form,
                          $request->{_locale});
 }
 
@@ -302,31 +309,35 @@ sub _process_chart {
 
     my ($request, $entries) = @_;
 
+    use constant ACCNO          => 0;
+    use constant DESCRIPTION    => 1;
+    use constant CHARTTYPE      => 2;
+    use constant CATEGORY       => 3;
+    use constant CONTRA         => 4;
+    use constant TAX            => 5;
+    use constant LINK           => 6;
+    use constant HEADING        => 7;
+    use constant GIFI_ACCNO     => 8;
+
     foreach my $entry (@$entries){
         my $account = LedgerSMB::DBObject::Account->new({base=>$request});
         my $settings = {
-            accno => $entry->[0],
-            description => $entry->[1],
-            charttype => $entry->[2],
-            category => $entry->[3],
-            contra => $entry->[4],
-            tax => $entry->[5],
+            accno => $entry->[ACCNO],
+            description => $entry->[DESCRIPTION],
+            charttype => $entry->[CHARTTYPE],
+            category => $entry->[CATEGORY],
+            contra => $entry->[CONTRA],
+            tax => $entry->[TAX],
 #            heading => $entry->[7],
-            gifi_accno => $entry->[8],
+            gifi_accno => $entry->[GIFI_ACCNO],
         };
-
-        if ($entry->[6] !~ /:/) {
-            $settings->{$entry->[6]} = 1
-                if ($entry->[6] ne "");
-        } else {
-            foreach my $link (split( /:/, $entry->[6])) {
-                $settings->{$link} = 1;
-            }
-        }
+        my @link = split /:/, $entry->[LINK];
+        @$settings{ @link } = ( (1) x @link);
 
         $account->merge($settings);
         $account->save();
     }
+    return;
 }
 
 sub _process_gifi {
@@ -339,6 +350,7 @@ sub _process_gifi {
     foreach my $entry (@$entries) {
         $sth->execute($entry->[0], $entry->[1]) || die $sth->errstr();
     }
+    return;
 }
 
 sub _process_sic {
@@ -351,6 +363,7 @@ sub _process_sic {
         $sth->execute($entry->[0], $entry->[1], $entry->[2])
             || die $sth->errstr();
     }
+    return;
 }
 
 sub _process_timecard {
@@ -361,10 +374,10 @@ sub _process_timecard {
         my $jc = {};
         my $counter = 0;
         for my $col (@{$cols->{timecard}}){
-            if ($request->{sep} eq ";" &&
+            if ($request->{sep} eq ';' &&
                 any { $_ eq $col } @floats) {
                 $entry->[$counter] =~ s/,/./;
-                $entry->[$counter] = 0 if $entry->[$counter] eq "";
+                $entry->[$counter] = 0 if $entry->[$counter] eq '';
             }
             $jc->{$col} = $entry->[$counter];
             ++$counter;
@@ -375,6 +388,7 @@ sub _process_timecard {
         $jc->{checkedout} = $jc->{transdate} if !$jc->{checkedout};
         LedgerSMB::Timecard->new(%$jc)->save;
     }
+    return;
 }
 
 sub _process_inventory {
@@ -382,21 +396,21 @@ sub _process_inventory {
     my $dbh = $request->{dbh};
 
     $dbh->do( # Not worth parameterizing for one input
-              "INSERT INTO inventory_report
+              'INSERT INTO inventory_report
                             (transdate, source)
-                     VALUES (".$dbh->quote($request->{transdate}).
-              ", 'CSV upload')"
+                     VALUES ('.$dbh->quote($request->{transdate}).
+              q{, 'CSV upload')}
         ) or $request->dberror();
 
     my ($report_id) = $dbh->selectrow_array(
-        "SELECT currval('inventory_report_id_seq')"
+        q{SELECT currval('inventory_report_id_seq')}
         ) or $request->dberror();
 
     @$entries =
         map { map_columns_into_hash($cols->{inventory}, $_) } @$entries;
-    &_inventory_single_date($request, $entries,
-                            $report_id, $request->{transdate});
 
+    return _inventory_single_date($request, $entries,
+                            $report_id, $request->{transdate});
 }
 
 sub _process_inventory_multi {
@@ -413,20 +427,21 @@ sub _process_inventory_multi {
 
     for my $key (keys %dated_entries) {
         $dbh->do( # Not worth parameterizing for one input
-                  "INSERT INTO inventory_report
+                  'INSERT INTO inventory_report
                             (transdate, source)
-                     VALUES (".$dbh->quote($key).
-                  ", 'CSV upload (' || ".$dbh->quote($request->{transdate})
-                  ." || ')')"
+                     VALUES ('.$dbh->quote($key).
+                  q{, 'CSV upload (' || }.$dbh->quote($request->{transdate})
+                  .q{ || ')')}
             ) or $request->dberror();
 
         my ($report_id) = $dbh->selectrow_array(
-            "SELECT currval('inventory_report_id_seq')"
+            q{SELECT currval('inventory_report_id_seq')}
             ) or $request->dberror();
 
         &_inventory_single_date($request, $dated_entries{$key},
                                 $report_id, $key);
     }
+    return;
 }
 
 our $process = {
@@ -450,39 +465,11 @@ This parses a file, and returns a the csv in tabular format.
 sub _parse_file {
     my $self = shift @_;
 
-    my $handle = $self->{_request}->upload('import_file');
-    my $contents = join("\n", <$handle>);
-    my $sep = "";
-    my $n = @{$cols->{$self->{type}}}-1; # 1 separator less than fields
+    my $handle = $self->upload('import_file');
+    my $csv = Text::CSV->new;
+    $csv->header($handle);
+    $self->{import_entries} = $csv->getline_all($handle);
 
-    $self->{import_entries} = [];
-    for my $line (split /(\r\n|\r|\n)/, $contents){
-        if ( $sep eq "" ) {
-            if    ($n == (() = $line =~  /,/g)) { $sep =  "," }
-            elsif ($n == (() = $line =~  /;/g)) { $sep =  ";" }
-            elsif ($n == (() = $line =~ /\t/g)) { $sep = "\t" }
-            else  { die "Unrecognized file format" }
-            $self->{sep} = $sep;
-        }
-        next if ($line !~ /$sep/);
-        my @fields;
-        $line =~ s/[^"]"",/"/g;
-        while ($line ne '') {
-            if ($line =~ /^"/){
-                $line =~ s/"(.*?)"($sep|$)//
-                    || $self->error($self->{_locale}->text('Invalid file'));
-                my $field = $1;
-                $field =~ s/\s*$//;
-                push @fields, $field;
-            } else {
-                $line =~ s/([^$sep]*)$sep?//;
-                my $field = $1;
-                $field =~ s/\s*$//;
-                push @fields, $field;
-            }
-        }
-        push @{$self->{import_entries}}, \@fields;
-    }
     return @{$self->{import_entries}};
 }
 
@@ -498,7 +485,7 @@ sub begin_import {
         ($template_file{$request->{type}}) ?
         $template_file{$request->{type}} : 'import_csv';
 
-    if (ref($template_setup->{$request->{type}}) eq "CODE") {
+    if (ref($template_setup->{$request->{type}}) eq 'CODE') {
         $template_setup->{$request->{type}}($request);
     }
 
@@ -513,7 +500,7 @@ sub begin_import {
     # $request->{page_id} =~ s/_/-/;
     # $request->{page_id} .= '-import';
     $request->{page_id} = 'batch-import';
-    return $template->render_to_psgi({ request => $request });
+    return $template->render({ request => $request });
 }
 
 =head2 run_import
@@ -539,7 +526,7 @@ sub run_import {
     return begin_import($request);
 }
 
-=head1 COPYRIGHT
+=head1 LICENSE AND COPYRIGHT
 
 Copyright(C) 2008-2013 The LedgerSMB Core Team.  This file may be re-used in
 accordance with the GNU General Public License (GNU GPL) v2 or at your option
@@ -547,7 +534,17 @@ any later version.  Please see the included LICENSE.txt for more details.
 
 =cut
 
-###TODO-LOCALIZE-DOLLAR-AT
-eval { do 'scripts/custom/import_trans.pl'; };
+{
+    local ($!, $@) = ( undef, undef);
+    my $do_ = 'scripts/custom/import_trans.pl';
+    if ( -e $do_ ) {
+        unless ( do $do_ ) {
+            if ($! or $@) {
+                warn "\nFailed to execute $do_ ($!): $@\n";
+                die ( "Status: 500 Internal server error (import_csv.pm)\n\n" );
+            }
+        }
+    }
+};
 
 1;

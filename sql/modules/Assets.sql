@@ -80,19 +80,16 @@ $$
                   ai.usable_life, -- years
                   ai.usable_life -
                   get_fractional_year(coalesce(max(report_date),
-                                         start_depreciation,
-                                         purchase_date),
-                                       coalesce(start_depreciation,
-                                         purchase_date)),
+                                               start_depreciation),
+                                      start_depreciation),
                   get_fractional_year(coalesce(max(report_date),
-                                         start_depreciation,
-                                         purchase_date),
-                                $2),
+                                               start_depreciation),
+                                      $2),
                   purchase_value - salvage_value,
                   coalesce(sum(l.amount), 0)),
             ai.department_id, ai.location_id
        FROM asset_item ai
-  LEFT JOIN asset_report_line l ON (l.asset_id = ai.id)
+  LEFT JOIN asset_report_line l ON (l.asset_id = ai.id and l.amount > 0)
   LEFT JOIN asset_report r ON (l.report_id = r.id)
       WHERE ai.id = ANY($1)
    GROUP BY ai.id, ai.start_depreciation, ai.purchase_date, ai.purchase_value,
@@ -115,19 +112,17 @@ $$
             asset_dep__straight_line_base(
                   ai.usable_life * 12,
                   ai.usable_life * 12 --months
-                  - months_passed(coalesce(start_depreciation, purchase_date),
+                  - months_passed(start_depreciation,
                                   coalesce(max(report_date),
-                                           start_depreciation,
-                                           purchase_date)),
+                                           start_depreciation)),
                   months_passed(coalesce(max(report_date),
-                                         start_depreciation,
-                                         purchase_date),
+                                         start_depreciation),
                                 $2),
                   purchase_value - salvage_value,
                   coalesce(sum(l.amount), 0)),
             ai.department_id, ai.location_id
        FROM asset_item ai
-  LEFT JOIN asset_report_line l ON (l.asset_id = ai.id)
+  LEFT JOIN asset_report_line l ON (l.asset_id = ai.id and l.amount > 0)
   LEFT JOIN asset_report r ON (l.report_id = r.id)
       WHERE ai.id = ANY($1)
    GROUP BY ai.id, ai.start_depreciation, ai.purchase_date, ai.purchase_value,
@@ -156,19 +151,17 @@ $$
             asset_dep__straight_line_base(
                   ai.usable_life,
                   ai.usable_life --months
-                  - months_passed(coalesce(start_depreciation, purchase_date),
+                  - months_passed(start_depreciation,
                                   coalesce(max(report_date),
-                                           start_depreciation,
-                                           purchase_date)),
+                                           start_depreciation)),
                   months_passed(coalesce(max(report_date),
-                                         start_depreciation,
-                                         purchase_date),
+                                         start_depreciation),
                                 $2),
                   purchase_value - salvage_value,
                   coalesce(sum(l.amount), 0)),
             ai.department_id, ai.location_id
        FROM asset_item ai
-  LEFT JOIN asset_report_line l ON (l.asset_id = ai.id)
+  LEFT JOIN asset_report_line l ON (l.asset_id = ai.id and l.amount > 0)
   LEFT JOIN asset_report r ON (l.report_id = r.id)
       WHERE ai.id = ANY($1)
    GROUP BY ai.id, ai.start_depreciation, ai.purchase_date, ai.purchase_value,
@@ -193,9 +186,14 @@ DECLARE
         t_dep_amount numeric;
 
 Begin
-        INSERT INTO gl (reference, description, transdate, approved)
-        SELECT setting_increment('glnumber'), 'Asset Report ' || asset_report.id,
-                report_date, false
+        INSERT INTO gl (reference, description, transdate,
+                        approved, trans_type_code)
+        SELECT setting_increment('glnumber'),
+               'Asset Report ' || asset_report.id,
+                report_date,
+                coalesce((select value::boolean from defaults
+                           where setting_key = 'debug_fixed_assets'), true),
+                'fa'
         FROM asset_report
         JOIN asset_report_line
                 ON (asset_report.id = asset_report_line.report_id)
@@ -230,7 +228,8 @@ COMMENT ON FUNCTION asset_report__generate_gl
 (in_report_id int, in_accum_account_id int) IS
 $$ Generates a GL transaction when the Asset report is approved.
 
-Currently this creates GL drafts, not approved transctions
+Create approved transactions, unless the value of the setting_key
+'debug_fixed_assets' evaluates to false
 $$;
 
 CREATE OR REPLACE FUNCTION asset_class__get (in_id int) RETURNS asset_class AS
@@ -654,18 +653,20 @@ CREATE TYPE asset_nbv_line AS (
 CREATE OR REPLACE FUNCTION asset_nbv_report ()
 returns setof asset_nbv_line AS
 $$
-   SELECT ai.id, ai.tag, ai.description, coalesce(ai.start_depreciation, ai.purchase_date),
+   SELECT ai.id, ai.tag, ai.description, ai.start_depreciation,
           adm.short_name, ai.usable_life
-           - months_passed(coalesce(ai.start_depreciation, ai.purchase_date),
-                                  coalesce(max(r.report_date),
-                                           ai.start_depreciation,
-                                           ai.purchase_date))/ 12,
+           - months_passed(ai.start_depreciation,
+                           coalesce(max(r.report_date),
+                                    ai.start_depreciation))/ 12,
           ai.purchase_value - ai.salvage_value, ai.salvage_value, max(r.report_date),
           sum(rl.amount), ai.purchase_value - coalesce(sum(rl.amount), 0)
      FROM asset_item ai
      JOIN asset_class ac ON (ai.asset_class_id = ac.id)
      JOIN asset_dep_method adm ON (adm.id = ac.method)
-LEFT JOIN asset_report_line rl ON (ai.id = rl.asset_id)
+LEFT JOIN (select arl.*
+             from asset_report_line arl
+             join asset_report ar on arl.report_id = ar.id
+            where approved_at is not null) rl ON (ai.id = rl.asset_id)
 LEFT JOIN asset_report r on (rl.report_id = r.id)
     WHERE r.id IS NULL OR r.approved_at IS NOT NULL
  GROUP BY ai.id, ai.tag, ai.description, ai.start_depreciation, ai.purchase_date,
@@ -750,10 +751,9 @@ CREATE OR REPLACE FUNCTION asset_report__disposal_gl
 (in_id int, in_gain_acct int, in_loss_acct int)
 RETURNS bool AS
 $$
-  INSERT
-    INTO gl (reference, description, transdate, approved)
+  INSERT INTO gl (reference, description, transdate, approved, trans_type_code)
   SELECT setting_increment('glnumber'), 'Asset Report ' || asset_report.id,
-                report_date, false
+                report_date, false, 'fd'
     FROM asset_report
     JOIN asset_report_line ON (asset_report.id = asset_report_line.report_id)
     JOIN asset_item        ON (asset_report_line.asset_id = asset_item.id)
@@ -864,7 +864,7 @@ CREATE TYPE asset_report_line_result AS(
 CREATE OR REPLACE FUNCTION asset_report__get_lines(in_id int)
 RETURNS SETOF asset_report_line_result
 as $$
-   select ai.tag, coalesce(ai.start_depreciation, ai.purchase_date), ai.purchase_value, m.short_name,
+   select ai.tag, ai.start_depreciation, ai.purchase_value, m.short_name,
           ai.usable_life,
           ai.purchase_value - ai.salvage_value, max(pr.report_date),
           sum(case when pr.report_date < r.report_date then prl.amount
@@ -950,7 +950,7 @@ $$
      JOIN asset_class ac ON (ai.asset_class_id = ac.id)
 LEFT JOIN asset_report_line arl ON (arl.asset_id = ai.id)
 LEFT JOIN asset_report ar ON (arl.report_id = ar.id)
-    WHERE COALESCE(ai.start_depreciation, ai.purchase_date) <= $3 AND ac.id = $2
+    WHERE ai.start_depreciation <= $3 AND ac.id = $2
           AND obsolete_by IS NULL
  GROUP BY ai.id, ai.tag, ai.description, ai.purchase_value, ai.usable_life,
           ai.purchase_date, ai.location_id, ai.invoice_id, ai.asset_account_id,
@@ -1097,44 +1097,6 @@ COMMENT ON FUNCTION asset_report__record_approve(in_id int) IS
 $$Marks the asset_report record approved.  Not generally recommended to call
 directly.$$;
 
-create or replace function asset_depreciation__approve(in_report_id int, in_expense_acct int)
-returns asset_report
-as $$
-declare retval asset_report;
-begin
-
-retval := asset_report__record_approve(in_report_id);
-
-INSERT INTO gl (reference, description, approved)
-select 'Asset Report ' || in_id, 'Asset Depreciation Report for ' || report_date,
-       false
- FROM asset_report where id = in_id;
-
-INSERT INTO acc_trans (amount, chart_id, transdate, approved, trans_id)
-SELECT l.amount, a.dep_account_id, r.report_date, true, currval('id')
-  FROM asset_report r
-  JOIN asset_report_line l ON (r.id = l.report_id)
-  JOIN asset_item a ON (a.id = l.asset_id)
- WHERE r.id = in_id;
-
-INSERT INTO acc_trans (amount, chart_id, transdate, approved, trans_id)
-SELECT sum(l.amount) * -1, in_expense_acct, r.report_date, approved,
-       currval('id')
-  FROM asset_report r
-  JOIN asset_report_line l ON (r.id = l.report_id)
-  JOIN asset_item a ON (a.id = l.asset_id)
- WHERE r.id = in_id
- GROUP BY r.report_date;
-
-
-return retval;
-
-end;
-$$ language plpgsql;
-
-COMMENT ON function asset_depreciation__approve
-(in_report_id int, in_expense_acct int) IS
-$$Approves an asset depreciation report and creats the GL draft.$$;
 
 CREATE OR REPLACE FUNCTION asset_report__get_disposal_methods()
 RETURNS SETOF asset_disposal_method as
@@ -1166,9 +1128,9 @@ if retval.report_class = 2 then
      t_disposed_percent := 100;
 end if;
 
-INSERT INTO gl (reference, description, approved, transdate)
+INSERT INTO gl (reference, description, approved, transdate, trans_type_code)
 select 'Asset Report ' || in_id, 'Asset Disposal Report for ' || report_date,
-       false, report_date
+       false, report_date, 'fd'
  FROM asset_report where id = in_id;
 
 -- REMOVING ASSETS FROM ACCOUNT (Credit)

@@ -1,10 +1,11 @@
-=pod
+
+package LedgerSMB::Scripts::file;
 
 =head1 NAME
 
 LedgerSMB::Scripts::file - web entry points for file storage and retrieval
 
-=head1 SYNOPSIS
+=head1 DESCRIPTION
 
 This supplies file retrieval and attachment workflows
 
@@ -20,8 +21,6 @@ Requires that id and file_class be set.
 
 =cut
 
-package LedgerSMB::Scripts::file;
-
 use strict;
 use warnings;
 
@@ -34,15 +33,18 @@ use LedgerSMB::File::ECA;
 use LedgerSMB::File::Internal;
 use LedgerSMB::File::Incoming;
 use DBD::Pg qw(:pg_types);
+use LedgerSMB::Magic qw(  FC_TRANSACTION FC_ORDER FC_PART FC_ENTITY FC_ECA 
+            FC_INTERNAL FC_INCOMING);
+use HTTP::Status qw( HTTP_OK HTTP_SEE_OTHER );
 
 our $fileclassmap = {
-   1   => 'LedgerSMB::File::Transaction',
-   2   => 'LedgerSMB::File::Order',
-   3   => 'LedgerSMB::File::Part',
-   4   => 'LedgerSMB::File::Entity',
-   5   => 'LedgerSMB::File::ECA',
-   6   => 'LedgerSMB::File::Internal',
-   7   => 'LedgerSMB::File::Incoming',
+   FC_TRANSACTION()   => 'LedgerSMB::File::Transaction',
+   FC_ORDER()         => 'LedgerSMB::File::Order',
+   FC_PART()          => 'LedgerSMB::File::Part',
+   FC_ENTITY()        => 'LedgerSMB::File::Entity',
+   FC_ECA()           => 'LedgerSMB::File::ECA',
+   FC_INTERNAL()      => 'LedgerSMB::File::Internal',
+   FC_INCOMING()      => 'LedgerSMB::File::Incoming',
 };
 
 sub get {
@@ -54,7 +56,7 @@ sub get {
 
     $file->get_mime_type;
     if ($file->mime_type_text eq 'text/x-uri'){
-        return [ 303,  # Found
+        return [ HTTP_SEE_OTHER,
                  [ 'Location' => $file->content ],
                  [] ];
     }
@@ -63,7 +65,7 @@ sub get {
     $mime_type .= '; charset=utf-8'
         if $mime_type =~ /^text\//;
 
-    return [ 200,
+    return [ HTTP_OK,
              [ 'Content-Type' => $mime_type,
                'Content-Disposition' =>
                    'attachment; filename="' . $file->file_name . '"' ],
@@ -86,7 +88,7 @@ sub show_attachment_screen {
         template => 'attachment_screen',
         format   => 'HTML'
     );
-    return $template->render_to_psgi($request);
+    return $template->render($request);
 }
 
 =item attach_file
@@ -98,39 +100,49 @@ Attaches a file to an object
 sub attach_file {
     my ($request) = @_;
     my $file = $fileclassmap->{$request->{file_class}}->new(%$request);
-    my @fnames =  $request->{_request}->upload_info;
-    $file->file_name($fnames[0]) if $fnames[0];
+
     if ($request->{url}){
         $file->file_name($request->{url});
-    $file->mime_type_text('text/x-uri');
-        $file->file_name($request->{url});
+        $file->mime_type_text('text/x-uri');
         $file->get_mime_type;
         $file->content($request->{url});
-    } else {
-        if (!$fnames[0]){
-             $request->error($request->{_locale}->text(
-                  'No file uploaded'
-             ));
-        }
-        $file->file_name($fnames[0]);
-        $file->get_mime_type;
-        my $fh = $request->{_request}->upload('upload_data');
-        binmode $fh, ':raw';
-        my $fdata = join ("", <$fh>);
-        $file->content($fdata);
     }
+    else {
+        # Expecting a file upload.
+        my $upload = $request->{_uploads}->{upload_data}
+            or die $request->{_locale}->text('No file uploaded');
+
+        # Slurp uploaded file.
+        # Wrapped in a block to tightly localise $/, otherwise loading of
+        # the mime database within the underlying MIME::Types module fails,
+        # without raising an error.
+        {
+            open my $fh, '<', $upload->path or die "Error opening uploaded file $!";
+            binmode $fh;
+            local $/ = undef;
+            $file->content(<$fh>);
+            $file->file_name($upload->basename);
+        }
+
+        # If provided, use the content-type submitted by the browser.
+        # Otherwise the underlying file module will guess the mime type
+        # according to the uploaded file extension.
+        $file->mime_type_text($upload->content_type) if $upload->content_type;
+        $file->get_mime_type;
+    }
+
     $file->attach;
 
-    return [ 303,  # Found
+    return [ HTTP_SEE_OTHER,
              [ 'Location' => $request->{callback} ],
              [ ] ];
 }
 
 =back
 
-=head1 COPYRIGHT
+=head1 LICENSE AND COPYRIGHT
 
-Copyright (C) 2011-2016 LedgerSMB Core Team.  This file is licensed under the GNU
+Copyright (C) 2011-2018 LedgerSMB Core Team.  This file is licensed under the GNU
 General Public License version 2, or at your option any later version.  Please
 see the included License.txt for details.
 

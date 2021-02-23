@@ -1,161 +1,254 @@
-<?lsmb INCLUDE 'ui-header.html'
-       titlebar = text("Balance Sheet")
-       include_stylesheet = [ "css/system/filters.css" ];
-       PROCESS 'elements.html';
+<?lsmb PROCESS 'elements.html';
        PROCESS 'report_base.html'; ?>
 <body class="lsmb <?lsmb dojo_theme ?>">
 <div id="balance-sheet-parameters">
     <form data-dojo-type="lsmb/Form"
           action="reports.pl" method="get">
-        <div class="listtop"><?lsmb text('Balance Sheet') ?></div>
-        <div class="input_row">
-            <?lsmb PROCESS date_to_date_div
-                       label = text('Through date')
-                    required = 'true'
-           "data-dojo-props" = 'missingMessage:"' _ text('Ooops! You forgot through date!') _ '''"'
-                ; ?>
-        </div>
-        <div class="input_row">
-        <?lsmb
-        PROCESS input element_data = {
-           label = text('GIFI')
-            name = 'gifi'
-              id = 'gifi'
-            type = 'checkbox'
-        };
-        ?></div>
-        <div class="input_row">
-        <?lsmb
-        PROCESS input element_data = {
-           label = text('Account numbers')
-            name = 'incl_accnos'
-              id = 'incl_accnos'
-            type = 'checkbox'
-         checked = 'checked' # checked by default
-        };
-        ?></div>
-        <div class="input_row">
-        <?lsmb text('Hierarchy type') ?>
-        <?lsmb
-        HIERARCHY_SETUP = earn_id;
-        IF HIERARCHY_SETUP;
-            full_checked = 'CHECKED';
-            full_disabled = undef;
-            legacy_checked = undef;
-        ELSE;
-            full_disabled = 'DISABLED';
-            full_checked = undef;
-            legacy_checked = 'CHECKED';
-        END;
-        PROCESS input element_data = {
-           label = text('Full')
-            type = 'radio'
-            name = 'legacy_hierarchy'
-           value = 0
-              id = 'legacy-hierarchy-0'
-         checked = full_checked
-        disabled = full_disabled
-        };
+      <div class="listtop"><?lsmb text('Balance Sheet') ?></div>
 
-        PROCESS input element_data = {
-           label = text('Account category')
-            type = 'radio'
-            name = 'legacy_hierarchy'
-           value = 1
-              id = 'legacy-hierarchy-1'
-         checked = legacy_checked
-        };
-        ?>
-        </div>
-        <?lsmb IF full_disabled ?>
-            <div class="setupwarning" id="warning-hierarchy-not-setup">
-              <a href="http://ledgersmb.org/topic/using-account-hierarchies-reporting" target='_blank'><?lsmb text('Not set up for hierarchy reporting, please see linked instructions') ?></a>
+      <fieldset>
+        <legend><?lsmb text('Report type') ?></legend>
+        <div class="input_row">
+          <div class="label"><?lsmb text('GIFI') ?></div>
+          <div class="input_group">
+            <div class="input_option">
+              <?lsmb
+                 PROCESS input element_data = {
+                 label = text('Regular')
+                 name = 'gifi'
+                 value = 0
+                 type = 'radio'
+                 checked = 'checked'
+                 }
+                 label_pos = 1 ;
+                 ?>
             </div>
-        <?lsmb END ?>
-
-        <div class="subsection">
-        <?lsmb
-        PROCESS select element_data = {
-                 label = text('Language')
-                  name = 'language'
-               options = languages
-             text_attr = 'description'
-            value_attr = 'code'
-        default_values = [USER.language]
-        }
-        ?>
-        </div>
-
-        <div class="subsection">
-            <div class="label">
-                <?lsmb text('Comparison selection by') ?>
+            <div class="input_option">
+              <?lsmb
+                 PROCESS input element_data = {
+                 label = text('GIFI')
+                 name = 'gifi'
+                 value = 1
+                 type = 'radio'
+                 }
+                 label_pos = 1 ;
+                 ?>
             </div>
-            <div class="input_row" id="comparison_type_radios">
+          </div>
+        </div>
+      </fieldset>
+
+
+      <fieldset data-dojo-type="lsmb/reports/PeriodSelector"
+                data-dojo-props="channel:'ui/reports/date-selection'">
+        <legend><?lsmb text('Date selection') ?></legend>
+        <div class="input_row">
+          <div class="label">
+            <?lsmb text('Select using') ?>
+          </div>
+          <?lsmb
+             IF comparison_type == 'by_periods';
+             YES="CHECKED";
+             NO=undef;
+             ELSE;
+             NO="CHECKED";
+             YES=undef;
+             END;
+             ?>
+          <div class="input_group">
+            <div class="input_option">
+              <?lsmb
+                 label_pos = -1; # Something leaky again
+                 PROCESS input element_data={
+                 type = 'radio',
+                 name = 'comparison_type',
+                 id = 'comparison_by_dates',
+                 value = 'by_dates',
+                 label = text('Dates'),
+                 checked = NO
+                 }
+                 label_pos = 1;
+                 ?>
+            </div>
+            <div class="input_option">
+              <?lsmb
+                 PROCESS input element_data={
+                 type = 'radio',
+                 name = 'comparison_type',
+                 id = 'comparison_by_periods',
+                 value = 'by_periods',
+                 label = text('Periods'),
+                 checked = YES,
+                 }
+                 label_pos = 1;
+                 ?>
+            </div>
+          </div>
+        </div>
+        <div class="input_row" id="date_to_date_id">
+          <?lsmb
+             label_pos = -1;
+             PROCESS input element_data = {
+             label = text('As per') #'
+             name = 'to_date'
+             value = to_date
+             class = 'date'
+             size = 12
+             };
+             ?>
+        </div>
+        <div class="input_row" id="date_period_id">
+          <?lsmb
+             PROCESS date_period_div; ?>
+        </div>
+        <div class="input_row">
+          <div class="label">
+            <?lsmb text('Ignore year-closing') ?>
+          </div>
+
+          <div class="input_group">
             <?lsmb
-                PROCESS input element_data={
-                   value = 'by_periods'
-                      id = 'comparison_by_periods'
-                    name = 'comparison_type',
-                   label = text('Periods')
-                    type = "radio"
-                 checked = (comparison_type == 'by_periods') ? "checked" : undef
-                    "data-dojo-type" = "lsmb/PublishRadioButton"
-                   "data-dojo-props" = "topic:'ui/report/comparison-selection'"
-                };
-
-                PROCESS input element_data={
-                      id = 'comparison_by_dates'
-                    name = 'comparison_type',
-                   label = text('Dates')
-                   value = 'by_dates'
-                 checked = (comparison_type == 'by_dates') ? "checked" : undef
-                    type = "radio"
-                    "data-dojo-type" = "lsmb/PublishRadioButton"
-                   "data-dojo-props" = "topic:'ui/report/comparison-selection'"
-                }; ?>
-            </div>
-
-            <div class="input_row"><?lsmb
-            PROCESS input element_data = {
-                     label = text('Comparison Periods')
-                 text_attr = 'description'
-                        id = 'comparison_periods'
-                      name = 'comparison_periods'
-                      size = 3
-                     value = comparison_periods
-                           "data-dojo-type" = "lsmb/PublishNumberTextBox"
-                          "data-dojo-props" = "topic:'ui/report/comparison-selection',
-                                               placeHolder:'0',
-                                               constraints:{min:0,max:9,places:0,pattern:0},
-                                               invalidMessage:'Please enter a numeric value.',
-                                               rangeMessage:'Invalid number of periods.'"
-            };
-            ?></div>
-            <div id='date_period_id' >
-                <?lsmb PROCESS date_period_type_div
-                       label = text('Period type')
-                               required = true; ?>
-            </div>
-            <div>
-               <div class="input_row" data-dojo-type="lsmb/ComparisonSelectionBalance"
-                                     data-dojo-props="topic:'ui/report/comparison-selection'">
-                    <h3><?lsmb text('Enter date ranges for comparison') ?></h3>
-                    <?lsmb FOREACH c IN [1 .. 9]; ?>
-                        <div id="comparison_dates_<?lsmb c ?>">
-                            <?lsmb PROCESS date_to_date_div
-                                    label = text('Through date') _ ' ' _ c
-                                 required = 'false'
-                        "data-dojo-props" = 'missingMessage:"' _ text('Ooops! You forgot through date!') _ '''"'
-                                   SUFFIX = '_' _ c;
-                            ?>
-                        </div>
-                    <?lsmb END ?>
-               </div>
-            </div>
+               PROCESS select element_data = {
+               options = [
+               {
+               label="All",
+               id="all",
+               },
+               {
+               label="Last",
+               id="last"
+               },
+               {
+               label="None",
+               id="none",
+               }
+               ],
+               default_values = [report.ignore_yearend],
+               name = 'ignore_yearend',
+               text_attr = 'label',
+               value_attr = 'id',
+               }
+               ?>
+          </div>
         </div>
+      </fieldset>
+
+
+      <fieldset data-dojo-type="lsmb/reports/ComparisonSelector"
+                data-dojo-props="channel:'ui/reports/date-selection'">
+        <legend><?lsmb
+                   PROCESS input element_data = {
+                   label = text('Comparison Dates')
+                   name = 'comparison_periods'
+                   value = 0
+                   size = '3'
+                   "data-dojo-type"="dijit/form/NumberSpinner"
+                   "data-dojo-props"="constraints:{min:0,max:9,places:0},intermediateChanges:true,style:'width:7ex'"
+                   };
+                   ?></legend>
+        <div id="comparison_dates">
+          <?lsmb FOREACH c IN [1 .. 9]; ?>
+          <div class="input_row">
+            <div id="comparison_dates_<?lsmb c ?>" style="display:none">
+              <?lsmb
+                 label_pos = -1; # we need to find the leaky stuff!
+                 PROCESS input element_data = {
+                 label = text('Through date') #'
+                 name = 'to_date_' _ c
+                 value = to_date
+                 class = 'date'
+                 size = 12
+                 };
+                 ?>
+            </div>
+          </div>
+          <?lsmb END ?>
+        </div>
+      </fieldset>
+
+
+      <fieldset>
+        <legend>Report options</legend>
+        <div class="input_row">
+          <?lsmb
+             label_pos = -1;  # Something leaks label_pos...
+             PROCESS input element_data = {
+             label = text('Account numbers')    #'
+             name = 'incl_accnos'
+             type = 'checkbox'
+             value = 1
+             checked = 'checked' # checked by default
+             };
+             ?>
+        </div>
+        <div class="input_row">
+          <div class="label">
+            <?lsmb text('Hierarchy type') ?>
+          </div>
+          <div class="input_group">
+            <?lsmb
+               HIERARCHY_SETUP = earn_id;
+               IF HIERARCHY_SETUP;
+               full_checked = 'CHECKED';
+               full_disabled = undef;
+               legacy_checked = undef;
+               ELSE;
+               full_disabled = 'DISABLED';
+               full_checked = undef;
+               legacy_checked = 'CHECKED';
+               END;
+               ?>
+            <div class="input_option">
+              <?lsmb
+                 PROCESS input element_data = {
+                 label = text('Full')
+                 type = 'radio'
+                 name = 'legacy_hierarchy'
+                 value = 0
+                 id = 'legacy-hierarchy-0'
+                 checked = full_checked
+                 disabled = full_disabled
+                 }
+                 label_pos = 1;
+                 ?>
+              <?lsmb IF full_disabled ?>
+              <span class="setupwarning" id="warning-hierarchy-not-setup">
+                <a href="http://ledgersmb.org/topic/using-account-hierarchies-reporting" target='_blank'><?lsmb text('Not set up for hierarchy reporting, please see linked instructions') ?></a>
+        </span>
+              <?lsmb END ?>
+            </div>
+            <div class="input_option">
+              <?lsmb
+                 PROCESS input element_data = {
+                 label = text('Account category')
+                 type = 'radio'
+                 name = 'legacy_hierarchy'
+                 value = 1
+                 id = 'legacy-hierarchy-1'
+                 checked = legacy_checked
+                 }
+                 label_pos = 1;
+                 ?>
+            </div>
+          </div>
+        </div>
+        <div class="input_row">
+          <?lsmb
+             PROCESS select element_data = {
+             label = text('Language')
+             name = 'language'
+             options = languages
+             text_attr = 'description'
+             value_attr = 'code'
+             default_values = [USER.language]
+             } ?>
+        </div>
+      </fieldset>
+
+
         <?lsmb
         PROCESS button element_data = {
-            text = text('Generate')
+            text = text('Continue')
             name = 'action'
            value = 'generate_balance_sheet'
             type = 'submit'
@@ -164,4 +257,3 @@
     </form>
 </div>
 </body>
-</html>

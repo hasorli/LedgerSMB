@@ -1,5 +1,3 @@
-#!/usr/bin/perl
-#
 ######################################################################
 # LedgerSMB Accounting and ERP
 
@@ -46,25 +44,6 @@
 #
 #######################################################################
 
-our $logger=Log::Log4perl->get_logger('old-handler-chain');#make logger available to other old programs
-
-# Clearing all namespaces for persistant code use
-for my $nsp (qw(lsmb_legacy Form GL AA IS IR OE PE IC AM)) {
-   for my $k (keys %{"${nsp}::"}){
-        next if $k =~ /[A-Z]+/;
-        next if $k eq 'try' or $k eq 'catch';
-        next if *{"${nsp}::{$k}"}{CODE};
-        if (*{"${nsp}::{$k}"}{ARRAY}) {
-            @{"${nsp}::{$k}"} = () unless /^(?:INC|ISA|EXPORT|EXPORT_OK|ARGV|_|\W)$/;
-        }
-        if (*{"${nsp}::{$k}"}{HASH}) {
-            %{"${nsp}::{$k}"} = ();
-        }
-        if (*{"${nsp}::{$k}"}{SCALAR}){
-           ${"${nsp}::{$k}"} = undef;
-        }
-    }
-}
 package lsmb_legacy;
 use Digest::MD5;
 use Try::Tiny;
@@ -73,41 +52,49 @@ $| = 1;
 
 binmode (STDIN, ':utf8');
 binmode (STDOUT, ':utf8');
+use LedgerSMB;
 use LedgerSMB::User;
 use LedgerSMB::Form;
 use LedgerSMB::Locale;
-use LedgerSMB::Auth;
 use LedgerSMB::App_State;
-use Data::Dumper;
-
-
-$form = new Form;
-use LedgerSMB;
+use LedgerSMB::Middleware::RequestID;
 use LedgerSMB::Sysconfig;
+
+use Data::UUID;
+use Log::Log4perl;
+
+$form = Form->new;
+# name of this script
+my $script;
+$uri = $ENV{REQUEST_URI};
+$uri =~ s/\?.*//;
+$ENV{SCRIPT_NAME} = $uri;
+$ENV{SCRIPT_NAME} =~ m/([^\/\\]*.pl)\?*.*$/;
+$script = $1;
+$script =~ m/(.*)\.pl/;
+my $script_module = $1;
+
+$form->{action} = $form->{nextsub} if (!$form->{action} and $form->{nextsub});
+
+
+#make logger available to other old programs
+our $logger=Log::Log4perl->get_logger("lsmb.$script_module.$form->{action}");
+local $SIG{__WARN__} = sub {
+    my $msg = shift;
+
+    local $Log::Log4perl::caller_depth = $Log::Log4perl::caller_depth + 1;
+    $msg =~ s/\n/\\n/g;
+    $logger->warn($msg);
+};
 
 print 'Set-Cookie: '
     . $form->{"request.download-cookie"} . '=downloaded' . "\n"
     if $form->{"request.download-cookie"};
 
-# name of this script
-my $script;
-if ($ENV{GATEWAY_INTERFACE} =~ /^CGI/){
-    $uri = $ENV{REQUEST_URI};
-    $uri =~ s/\?.*//;
-    $ENV{SCRIPT_NAME} = $uri;
-    $ENV{SCRIPT_NAME} =~ m/([^\/\\]*.pl)\?*.*$/;
-    $script = $1;
-} else {
-    $0 =~ tr/\\/\//;
-    $pos = rindex $0, '/';
-    $script = substr( $0, $pos + 1 );
-}
-
 
 $locale = LedgerSMB::Locale->get_handle( ${LedgerSMB::Sysconfig::language} )
   or $form->error( __FILE__ . ':' . __LINE__ . ": Locale not loaded: $!\n" );
 
-$form->{action} = $form->{nextsub} if (!$form->{action} and $form->{nextsub});
 
 # we use $script for the language module
 $form->{script} = $script;
@@ -125,6 +112,10 @@ $locale->encoding('UTF-8');
 
 try {
     $form->db_init( \%myconfig );
+    print 'Set-Cookie: '
+        . LedgerSMB::Sysconfig::cookie_name . '='
+        . $form->{_new_session_cookie_value} . "\n"
+        if $form->{_new_session_cookie_value};
 
     # we get rid of myconfig and use User as a real object
     %myconfig = %{ LedgerSMB::User->fetch_config( $form ) };
@@ -134,7 +125,7 @@ try {
 
     if ($myconfig{language}){
         $locale   = LedgerSMB::Locale->get_handle( $myconfig{language} )
-            or LedgerSMB::_error($form, __FILE__ . ':' . __LINE__
+            or _error($form, __FILE__ . ':' . __LINE__
                        . ": Locale not loaded: $!\n" );
     }
 
@@ -172,24 +163,46 @@ try {
         $form->error( __FILE__ . ':' . __LINE__ . ': '
                       . $locale->text('action not defined!'));
     }
-}catch  {
+}
+catch  {
   # We have an exception here because otherwise we always get an exception
   # when output terminates.  A mere 'die' will no longer trigger an automatic
   # error, but die 'foo' will map to $form->error('foo')
   # -- CT
     $form->{_error} = 1;
     $LedgerSMB::App_State::DBH = undef;
-    LedgerSMB::_error($form, "'$_'") unless $_ =~ /^Died/i or $_ =~ /^exit at /;
+    _error($form, "'$_'") unless $_ =~ /^Died/i or $_ =~ /^exit at /;
+    LedgerSMB::App_State::cleanup();
 };
 
 $logger->trace("leaving after script=old/bin/$form->{script} action=$form->{action}");#trace flow
 
-1;
-
 $form->{dbh}->commit if defined $form->{dbh};
-
 $form->{dbh}->disconnect()
     if defined $form->{dbh};
 
 # end
 
+
+sub _error {
+    my ($form, $msg, $status) = @_;
+    $msg = "? _error" if !defined $msg;
+    $status = 500 if ! defined $status;
+
+    print qq|Status: $status ISE
+Content-Type: text/html; charset=utf-8
+
+<html>
+<body><h2 class="error">Error!</h2> <p><b>$msg</b></p>
+<p>dbversion: $form->{dbversion}, company: $form->{company}</p>
+</body>
+</html>
+|;
+
+    local $Log::Log4perl::caller_depth = $Log::Log4perl::caller_depth + 1;
+    $msg =~ s/\n/\\n/g;
+    $logger->error($msg);
+}
+
+
+1;

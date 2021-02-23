@@ -1,3 +1,6 @@
+
+package LedgerSMB::Report::Invoices::Transactions;
+
 =head1 NAME
 
 LedgerSMB::Report::Invoices::Transactions - AR/AP Transactions Reports for
@@ -10,8 +13,8 @@ LedgerSMB
 
 =cut
 
-package LedgerSMB::Report::Invoices::Transactions;
 use Moose;
+use namespace::autoclean;
 extends 'LedgerSMB::Report';
 with 'LedgerSMB::Report::Dates', 'LedgerSMB::Report::Approval_Option';
 
@@ -260,7 +263,7 @@ sub columns {
            type => 'text'},
        { col_id => 'entity_name',
            name => $entity_name_label,
-       href_base =>"contact.pl?action=get&entity_class=".$self->entity_class,
+       href_base =>'contact.pl?action=get&entity_class='.$self->entity_class,
            type => 'href', },
        { col_id => 'invnumber',
            name => LedgerSMB::Report::text('Invoice'),
@@ -328,6 +331,7 @@ sub name {
     my $self = shift;
     return LedgerSMB::Report::text('Search AP') if $self->entity_class == 1;
     return LedgerSMB::Report::text('Search AR') if $self->entity_class == 2;
+    return;
 }
 
 =head1 METHODS
@@ -341,7 +345,7 @@ This runs the report and sets the $report->rows.
 
 sub run_report {
     my $self = shift;
-    $ENV{LSMB_ALWAYS_MONEY} = 1;
+    local $ENV{LSMB_ALWAYS_MONEY} = 1;
     $self->approved;
     my @rows = $self->call_dbmethod(funcname => 'report__aa_transactions');
     for my $r(@rows){
@@ -355,10 +359,10 @@ sub run_report {
                "&entity_id=$r->{entity_id}&meta_number=$r->{meta_number}";
         $r->{invnumber_href_suffix} = "$script?action=edit&id=$r->{id}";
     }
-    $self->rows(\@rows);
+    return $self->rows(\@rows);
 }
 
-=head1 COPYRIGHT
+=head1 LICENSE AND COPYRIGHT
 
 COPYRIGHT (C) 2012 The LedgerSMB Core Team.  This file may be re-used following
 the terms of the GNU General Public License version 2 or at your option any

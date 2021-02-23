@@ -1,6 +1,15 @@
+
+package LedgerSMB::Scripts::payroll;
+
 =head1 NAME
 
 LedgerSMB::Scripts::payroll - Payroll workflows for LedgerSMB
+
+=head1 DESCRIPTION
+
+This module handles the workflow routines for payroll management.  These are
+divided into three areas, namely income types, deduction types, and full payroll
+workflows.
 
 =head1 SYNPOSIS
 
@@ -8,19 +17,15 @@ LedgerSMB::Scripts::payroll - Payroll workflows for LedgerSMB
 
 =cut
 
-package LedgerSMB::Scripts::payroll;
-
 use strict;
 use warnings;
 
 use LedgerSMB::Payroll::Income_Type;
 use LedgerSMB::Template;
 
-=head1 DESCRIPTION
+=head1 METHODS
 
-This module handles the workflow routines for payroll management.  These are
-divided into three areas, namely income types, deduction types, and full payroll
-workflows.
+This module doesn't specify any methods.
 
 =head1 ROUTINES
 
@@ -51,7 +56,7 @@ sub show_income_type {
         template => 'income',
         format   => 'HTML'
     );
-    return $template->render_to_psgi($request);
+    return $template->render($request);
 }
 
 =item save_income_type
@@ -98,7 +103,7 @@ sub search_income_type {
         path     => 'UI/payroll',
         template => 'income_search',
         format   => 'HTML'
-    )->render_to_psgi($request);
+    )->render($request);
 }
 
 =item income_type_results
@@ -110,7 +115,8 @@ Displays income type search results
 sub income_type_results {
     my ($request) = @_;
     use LedgerSMB::Report::Payroll::Income_Types;
-    LedgerSMB::Report::Payroll::Income_Types->new(%$request)->render($request);
+    return LedgerSMB::Report::Payroll::Income_Types
+        ->new(%$request)->render($request);
 }
 
 =back
@@ -135,7 +141,7 @@ sub income_type_results {
 
 =head2 Approval and Check Printing
 
-=head1 COPYRIGHT
+=head1 LICENSE AND COPYRIGHT
 
 =cut
 

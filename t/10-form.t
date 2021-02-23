@@ -56,8 +56,6 @@
 use strict;
 use warnings;
 
-$ENV{TMPDIR} = 't/var';
-
 use Test::More 'no_plan';
 use Test::Trap qw(trap $trap);
 use Math::BigFloat;
@@ -77,7 +75,7 @@ sub redirect {
         print "redirected\n";
 }
 
-my $form = new Form;
+my $form = Form->new;
 my %myconfig;
 my $utfstr;
 my @r;
@@ -154,47 +152,26 @@ cmp_ok($form->numtextrows("hello world\n12345678901234567890\n", 20, 3), '==', 2
         'numtextrows: 2 rows (3 max)');
 
 ## $form->hide_form checks
-$form = new Form;
+$form = Form->new;
 
 $form->{header} = 1;
 @r = trap{$form->hide_form('path')};
 ok($form->{header}, 'hide_form: header flag not cleared');
 
 ## $form->info checks
-$form = new Form;
+$form = Form->new;
 $ENV{GATEWAY_INTERFACE} = 'yes';
-$form->{pre} = 'Blah';
 $form->{header} = 'Blah';
 
 @r = trap{$form->info('hello world')};
 like($trap->stdout, qr|<b>hello world</b>|,
         'info: CGI, pre-set header content');
-ok(!$form->{pre}, 'info: CGI, removed $self->{pre}');
 
 delete $form->{header};
 $ENV{LSMB_NOHEAD} = 0;
 
-delete $ENV{GATEWAY_INTERFACE};
-delete $ENV{info_function};
-$form->{pre} = 'Blah';
-$form->{header} = 'Blah';
-@r = trap{$form->info('hello world')};
-is($trap->stdout, "hello world\n",
-        'info: CLI, content');
-ok($form->{pre}, 'info: CLI, ignored $self->{pre}');
-
-$ENV{info_function} = 'main::form_info_func';
-SKIP: {
-        skip 'Environment variable info_function could not be set' unless
-                $ENV{info_function} eq 'main::form_info_func';
-        is($form->info('hello world'), 'hello world',
-                'info: CLI, function call');
-};
-delete $ENV{info_function};
-
-
 ## $form->isblank checks
-$form = new Form;
+$form = Form->new;
 $ENV{GATEWAY_INTERFACE} = 'yes';
 $form->{header} = 'yes';
 $form->{blank} = '    ';
@@ -203,7 +180,7 @@ is($trap->exit, undef,
         'isblank: Blank, termination');
 
 ## $form->header checks
-$form = new Form;
+$form = Form->new;
 $form->{header} = 'yes';
 ok(!$form->header, 'header: preset');
 
@@ -222,7 +199,7 @@ $ENV{LSMB_NOHEAD} = 0;
 ## $form->sort_column checks
 ## Note that sort_column merely sorts the value of $form->{sort} to being the
 ##  first element of the list, adding it if needed
-$form = new Form;
+$form = Form->new;
 @ary = ('projectnumber', 'description', 'name', 'startdate');
 $form->{sort} = 'name';
 is_deeply([$form->sort_columns(@ary)],
@@ -240,7 +217,7 @@ is_deeply([$form->sort_columns(@ary)], \@ary,
 ## $form->sort_order checks
 ## Note that $ordinal is intended to be a hashref mapping column names to
 ##  position
-$form = new Form;
+$form = Form->new;
 $aryref = ['projectnumber', 'description', 'name', 'startdate'];
 delete $form->{direction};
 delete $form->{sort};
@@ -288,22 +265,19 @@ is($form->sort_order($aryref, {name => 0, projectnumber => 3, startdate => 1}),
         'sort_order: direction => \'DESC\', sort => \'name\', ordinal b');
 
 ## $form->print_button checks
-$form = new Form;
+$form = Form->new;
 @r = trap{$form->print_button({'pear' => {'key' => 'P', 'value' => 'Pears'}}, 'pear')};
 is($trap->stdout, "<button data-dojo-type=\"dijit/form/Button\" class=\"submit\" type=\"submit\" name=\"action\" value=\"pear\" accesskey=\"P\" title=\"Pears [Alt-P]\">Pears</button>\n", 'print_button');
 
 ## $form->like checks
-$form = new Form;
+$form = Form->new;
 is($form->like('hello world'), '%hello world%', 'like');
 
 ## $form->redirect checks
-$form = new Form;
+$form = Form->new;
 ok(!defined $form->{callback}, 'redirect: No callback set');
 @r = trap{$form->redirect};
 is($trap->stdout, "Location: login.pl\nContent-type: text/html\n\n", 'redirect: No message or callback redirect');
-@r = trap{$form->redirect('hello world')};
-is($trap->stdout, "hello world\n",
-        'redirect: message, no callback redirect');
 $form->{callback} = 1;
 @r = trap{$form->redirect};
 is($trap->stdout, "", 'redirect: callback, no message redirect');

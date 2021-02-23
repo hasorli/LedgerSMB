@@ -1,10 +1,20 @@
+
+package LedgerSMB::Scripts::business_unit;
+
 =head1 NAME
 
 LedgerSMB::Scripts::business_unit - web entry points for reporting class admin
 
+=head1 DESCRIPTION
+
+Workflow routines for LedgerSMB business reporting units
+
+=head1 METHODS
+
+This module doesn't specify any methods.
+
 =cut
 
-package LedgerSMB::Scripts::business_unit;
 use LedgerSMB::Business_Unit_Class;
 use LedgerSMB::App_Module;
 use LedgerSMB::Business_Unit;
@@ -16,10 +26,6 @@ use strict;
 use warnings;
 
 $Carp::Verbose = 1;
-
-=head1 SYNOPSIS
-
-Workflow routines for LedgerSMB business reporting units
 
 =head1 FUNCTIONS
 
@@ -44,7 +50,7 @@ sub list_classes {
         template => 'list_classes',
         format => 'HTML'
     );
-    return $template->render_to_psgi({request => $request});
+    return $template->render({request => $request});
 }
 
 =item add
@@ -98,7 +104,7 @@ sub _display {
         template => 'edit',
         format => 'HTML'
     );
-    return $template->render_to_psgi($request);
+    return $template->render($request);
 
 }
 
@@ -133,7 +139,7 @@ If set, excludes those which are not associated with customers/vendors.
 sub list {
     my ($request) = @_;
     return LedgerSMB::Report::Listings::Business_Unit->new(%$request)
-        ->render_to_psgi($request);
+        ->render($request);
 }
 
 =item delete
@@ -177,7 +183,7 @@ Saves a new unit and returns to the add entry screen
 sub save_new {
     my ($request) = @_;
     my $unit = _save($request);
-    $request->{message} = $request->{_locale}->text("Added id [_1]", $unit->id);
+    $request->{message} = $request->{_locale}->text('Added id [_1]', $unit->id);
     return add($request);
 }
 
@@ -191,7 +197,7 @@ LedgerSMB::Business_Unit must be set for $request.
 sub save {
     my ($request) = @_;
     my $unit = _save($request);
-    $request->{message} = $request->{_locale}->text("Saved id [_1]", $unit->id);
+    $request->{message} = $request->{_locale}->text('Saved id [_1]', $unit->id);
     return edit($request);
 }
 
@@ -230,7 +236,7 @@ sub save_class {
     my @modules = $lsmb_modules->list;
     my $modlist = [];
     for my $mod (@modules){
-        if ($request->{"module_" . $mod->id}){
+        if ($request->{'module_' . $mod->id}){
             push @$modlist, $mod;
         }
     }
@@ -247,7 +253,7 @@ sub save_class {
 
 =back
 
-=head1 COPYRIGHT
+=head1 LICENSE AND COPYRIGHT
 
 Copyright (C) 2012 LedgerSMB core team.  Redistribution and use of work is
 governed under the GNU General Public License, version 2 or at your option any

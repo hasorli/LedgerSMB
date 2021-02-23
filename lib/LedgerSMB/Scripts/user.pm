@@ -1,10 +1,11 @@
-=pod
+
+package LedgerSMB::Scripts::user;
 
 =head1 NAME
 
 LedgerSMB::Scripts::user - web entry points for user self-administration
 
-=head1 SYNPOSIS
+=head1 DESCRIPTION
 
 User preferences and password setting routines for LedgerSMB.  These are all
 accessible to all users and do not perform administrative functions.
@@ -22,8 +23,7 @@ and defaults to indefinite validity.
 =over
 
 =cut
-package LedgerSMB::Scripts::user;
-use LedgerSMB;
+
 use LedgerSMB::Template;
 use LedgerSMB::DBObject::User;
 use LedgerSMB::App_State;
@@ -32,7 +32,7 @@ use warnings;
 
 our $VERSION = 1.0;
 
-my $slash = "::";
+my $slash = '::';
 
 =item preference_screen
 
@@ -56,10 +56,10 @@ sub preference_screen {
         format   => 'HTML'
     );
 
-    my $creds = LedgerSMB::Auth::get_credentials();
+    my $creds = $request->{_auth}->get_credentials();
     $user->{login} = $creds->{login};
     $user->{password_expires} =~ s/:(\d|\.)*$//;
-    return $template->render_to_psgi({ request => $request,
+    return $template->render({ request => $request,
                                        user => $user });
 }
 
@@ -103,7 +103,7 @@ sub change_password {
 
 =back
 
-=head1 COPYRIGHT
+=head1 LICENSE AND COPYRIGHT
 
 Copyright (C) 2009 LedgerSMB Core Team.  This file is licensed under the GNU
 General Public License version 2, or at your option any later version.  Please

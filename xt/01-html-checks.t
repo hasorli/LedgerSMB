@@ -13,6 +13,7 @@ my @on_disk = ();
 sub collect {
     my $module = $File::Find::name;
     return if $module !~ m/\.html$/
+           || $module =~ m(/setup/upgrade/epilogue.html) # unbalanced by design
            || $module =~ m/\/pod\//
            || $module =~ m(/js/)
            || $module =~ m(/js-src/(dijit|dojo|util)/);
@@ -39,17 +40,18 @@ sub content_test {
 
     my ($fh, @tab_lines, @trailing_space_lines, $text);
     $text = '';
-    open $fh, "<$filename";
+    open $fh, '<', $filename
+        or BAIL_OUT("failed to open $filename for reading $!");
+    $is_snippet = 1
+        if ($filename !~ m#(log(in|out))|main|(setup/(?!upgrade/))#
+            || $filename =~ m#setup/ui-db-credentials#);
     while (<$fh>) {
         push @tab_lines, ($.) if /\t/;
         push @trailing_space_lines, ($.) if / $/;
         $ui_header_used = 1 if /ui-header\.html/;
-        $is_snippet = 1 if /<?lsmb# HTML Snippet.*?>/;
-        $is_snippet = 1 if /<!-- HTML Snippet.*-->/;
-        $is_snippet = 1 if $filename =~ /js-src\/lsmb.*\/templates/;
         $text .= $_;
     }
-    close $fh;
+    close $fh or diag("failed to close $filename : $!");
 
     #Fix source text. Template statements have to be removed for now.
     #IF/ELSE/END branches will clash though. - YL
@@ -89,28 +91,28 @@ sub content_test {
     $lint->parse($text);
     $lint->eof;
 
-    fail("Line with tabs: " . (join ', ', @tab_lines))
+    my @reportable_errors;
+
+    push @reportable_errors,
+           "Line(s) with tabs: " . (join ', ', @tab_lines)
         if @tab_lines;
-    fail("Line with trailing space(s): " . (join ', ', @trailing_space_lines))
+    push @reportable_errors,
+           "Line with trailing space(s): " . (join ', ', @trailing_space_lines)
         if @trailing_space_lines;
 
-    my $error_count = $lint->errors;
-
-    local $TODO = "Postponed" if $filename =~ m/menu\/expanding.html/;
     foreach my $error ( $lint->errors ) {
-        if ( $error->as_string !~ m/(<\/?title>|<\?lsmb.+\?>)/
-           && ! ((  $error->as_string =~ m/<(head|html)> tag is required/
-                 || $error->as_string =~ m/<\/html> with no opening/ )
-                && ($ui_header_used || $is_snippet))
-           && ! ( $error->as_string =~ m/<body> tag is required/ && $is_snippet )
-            ) {
-            fail $error->as_string;
-        } else {
-            $error_count--;
-        }
+        next if $error->as_string =~ m/(<\/?title>|<\?lsmb.+\?>)/;
+        next if (($ui_header_used || $is_snippet)
+                 && $error->as_string =~ m/<(head|html)> tag is required/);
+        next if ($ui_header_used
+                 && $error->as_string =~ m/<\/html> with no opening/ );
+        next if ($is_snippet
+                 && $error->as_string =~ m/<body> tag is required/ );
+
+        push @reportable_errors, $error->as_string;
     }
-    ok((! @tab_lines) && (! @trailing_space_lines) && !$error_count,
-        "Source critique for '$filename'");
+    ok(scalar @reportable_errors == 0, "Source critique for '$filename'")
+       or diag(join("\n", @reportable_errors));
 }
 
 content_test($_) for @on_disk;

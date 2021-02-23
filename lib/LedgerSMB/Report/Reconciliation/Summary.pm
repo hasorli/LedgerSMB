@@ -1,3 +1,6 @@
+
+package LedgerSMB::Report::Reconciliation::Summary;
+
 =head1 NAME
 
 LedgerSMB::Report::Reconciliation::Summary - List of Reconciliation Reports for
@@ -10,11 +13,11 @@ LedgerSMB
 
 =cut
 
-package LedgerSMB::Report::Reconciliation::Summary;
 use Moose;
+use namespace::autoclean;
 use LedgerSMB::MooseTypes;
-extends "LedgerSMB::Report";
-with "LedgerSMB::Report::Dates";
+extends 'LedgerSMB::Report';
+with 'LedgerSMB::Report::Dates';
 
 =head1 DESCRIPTION
 
@@ -133,7 +136,7 @@ sub columns {
              {col_id => 'end_date',
                 name => LedgerSMB::Report::text('Statement Date'),
                 type => 'href',
-           href_base => "recon.pl?action=display_report&report_id=", },
+           href_base => 'recon.pl?action=display_report&report_id=', },
              {col_id => 'their_total',
                 name => LedgerSMB::Report::text('Statement Balance'),
                money => 1,
@@ -213,10 +216,10 @@ sub run_report {
         $r->{account} = $account->{$r->{chart_id}}->{name};
         $r->{row_id} = $r->{id};
     }
-    $self->rows(\@rows);
+    return $self->rows(\@rows);
 }
 
-=head1 COPYRIGHT
+=head1 LICENSE AND COPYRIGHT
 
 COPYRIGHT (C) 2012 The LedgerSMB Core Team.  This file may be re-used under the
 terms of the LedgerSMB General Public License version 2 or at your option any

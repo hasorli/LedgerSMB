@@ -1,3 +1,6 @@
+
+package LedgerSMB::Report::Inventory::Search_Adj;
+
 =head1 NAME
 
 LedgerSMB::Report::Inventory::Search_Adj - LedgerSMB report of
@@ -11,8 +14,8 @@ inventory adjustments
 
 =cut
 
-package LedgerSMB::Report::Inventory::Search_Adj;
 use Moose;
+use namespace::autoclean;
 use LedgerSMB::MooseTypes;
 extends 'LedgerSMB::Report';
 
@@ -119,13 +122,13 @@ sub columns {
 
 sub run_report {
     my ($self) = @_;
-    my @rows = $self->call_dbmethod(funcname => 'inventory_adj__search');
+    my @rows = $self->call_dbmethod(funcname => 'inventory_adjust__search');
     for my $row (@rows) {
         $row->{ar_invnumber_suffix} = $row->{ar_invoice_id};
         $row->{ap_invnumber_suffix} = $row->{ap_invoice_id};
         $row->{row_id} = $row->{id};
     }
-    $self->rows(\@rows);
+    return $self->rows(\@rows);
 }
 
 =back
@@ -140,7 +143,7 @@ sub run_report {
 
 =back
 
-=head1 COPYRIGHT
+=head1 LICENSE AND COPYRIGHT
 
 COPYRIGHT (C) 2012 The LedgerSMB Core Team.  This file may be re-used under the
 terms of the LedgerSMB General Public License version 2 or at your option any

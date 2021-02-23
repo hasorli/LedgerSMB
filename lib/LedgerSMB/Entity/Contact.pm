@@ -1,3 +1,6 @@
+
+package LedgerSMB::Entity::Contact;
+
 =head1 NAME
 
 LedgerSMB::Entity::Contact - Contact info handling for LSMB
@@ -18,8 +21,8 @@ companies in LedgerSMB.
 
 =cut
 
-package LedgerSMB::Entity::Contact;
 use Moose;
+use namespace::autoclean;
 use LedgerSMB::App_State;
 with 'LedgerSMB::PGObject';
 
@@ -180,13 +183,15 @@ contains either entity_id or credit_id, and location_id, and location class.
 sub delete {
     my ($ref) = @_;
     if ($ref->{for_credit}){
-        __PACKAGE__->call_procedure(funcname => 'eca__delete_contact',
-                                  args => [$ref->{credit_id}, $ref->{class_id},
-                                           $ref->{contact}]);
+        return __PACKAGE__->call_procedure(
+                        funcname => 'eca__delete_contact',
+                            args => [$ref->{credit_id},
+                $ref->{class_id},   $ref->{contact}]);
     } else {
-        __PACKAGE__->call_procedure(funcname => 'entity__delete_contact',
-                                  args => [$ref->{entity_id}, $ref->{class_id},
-                                           $ref->{contact}]);
+        return __PACKAGE__->call_procedure(
+                        funcname => 'entity__delete_contact',
+                            args => [$ref->{entity_id},
+                $ref->{class_id},   $ref->{contact}]);
     }
 }
 
@@ -204,7 +209,7 @@ sub list_classes {
 
 =back
 
-=head1 COPYRIGHT
+=head1 LICENSE AND COPYRIGHT
 
 OPYRIGHT (C) 2012 The LedgerSMB Core Team.  This file may be re-used under the
 terms of the GNU General Public License version 2 or at your option any later

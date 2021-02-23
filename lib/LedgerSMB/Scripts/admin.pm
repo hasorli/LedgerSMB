@@ -3,13 +3,11 @@ package LedgerSMB::Scripts::admin;
 use strict;
 use warnings;
 
-=pod
-
 =head1 NAME
 
 LedgerSMB:Scripts::admin - web entry points for user and perms management
 
-=head1 SYNOPSIS
+=head1 DESCRIPTION
 
 This module provides the workflow scripts for managing users and permissions.
 
@@ -59,10 +57,10 @@ sub list_sessions {
         last_used => 'Last Used',
         locks_active => 'Transactions Locked'
     };
-    my $column_heading = $template->column_heading($column_names);
+    my $column_heading = _column_heading($request, $column_names);
     my $rows = [];
-    my $rowcount = "0";
-    my $base_url = "admin.pl?action=delete_session";
+    my $rowcount = '0';
+    my $base_url = 'admin.pl?action=delete_session';
     for my $s (@sessions) {
         $s->{i} = $rowcount % 2;
         $s->{drop} = {
@@ -73,7 +71,7 @@ sub list_sessions {
         ++$rowcount;
     }
     $admin->{title} = $request->{_locale}->text('Active Sessions');
-    return $template->render_to_psgi({
+    return $template->render({
        form    => $admin,
        columns => $columns,
        heading => $column_heading,
@@ -98,7 +96,46 @@ sub delete_session {
 
 =back
 
-=head1 COPYRIGHT
+=cut
+
+# apply locale settings to column headings and add sort urls if necessary.
+sub _column_heading {
+    my $self = shift;
+    my ($names, $sortby) = @_;
+    my %sorturls;
+
+    if ($sortby) {
+        %sorturls = map
+        { $_ => $sortby->{href}."=$_"} @{$sortby->{columns}};
+    }
+
+    foreach my $attname (keys %$names) {
+
+        # process 2 cases - simple name => value, and complex name => hash
+        # pairs. The latter is used to include urls in column headers.
+
+        if (ref $names->{$attname} eq 'HASH') {
+            my $t = $self->{_locale}->maketext($names->{$attname}{text});
+            $names->{$attname}{text} = $t;
+        } else {
+            my $t = $self->{_locale}->maketext($names->{$attname});
+            if (defined $sorturls{$attname}) {
+                $names->{$attname} =
+                {
+                    text => $t,
+                     href => $sorturls{$attname}
+                };
+            } else {
+                $names->{$attname} = $t;
+            }
+        }
+    }
+
+    return $names;
+}
+
+
+=head1 LICENSE AND COPYRIGHT
 
 Copyright (C) 2010 LedgerSMB Core Team.  This file is licensed under the GNU
 General Public License version 2, or at your option any later version.  Please

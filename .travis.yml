@@ -1,47 +1,42 @@
 # run on GCE build as per suggested:
 # https://github.com/travis-ci/travis-ci/issues/3251#issuecomment-219675294
-sudo: required
+sudo: false
 dist: trusty
 language: perl
-env:
-  global:
-    # ledgersmb org uses Chris Travers' keys
-    - secure: UF72BIXXxkPTIJTV4jl3Sm2eg9JdSK0yNqZLdlF2eDc9M1WldvIOr2qg9zJDcBW7M3qB7wKbyBk6PMcqLcY7mCOVTHQB1ORJa8F4dLTK0JFbGLqARAheCrYjQPhy8cIySbV1yFs5hrP2KeTXd0ZcS0bA+MyK0azMRztu+P3WD80=
-    - secure: Htra4bK1HEcUoxtraW+Usv+xXuTlIAuMQDWDc7rrMKLKZMNDuC9buuGbOaXDJx1Rty8h05gMkEcN7LD0fD9FhFzDOW7cnKfYHtysH+Gq1a21TZIKb3lgT4n0344Qg/7FuoV9zUl7WWzW5bg6TYvchdOasJ9CVl4n92dYsr4Y+Ck=
-    # einhverfr user uses Chris Travers' keys
-    - secure: R6gsxVa7jZv6fvEyVi9+WiSRYwxnObYQdyuWNXKyybDSs+V+viJPuTomD6sZvkgNyP8YvSGiMRaRCchmLfBlMSbgvVGTpC8lHbhp/uXh3+ruA/fGHfDJnhEMqbOv0FDLvrivkfU98UP87lWms3HwYrq+wjfkVRRfFNdrjLTOVVk=
-    - secure: a9+NnKLUPrEi1+Xu2nHpUPPDOVMgwXkF2zfY1mhRJCGZ4dMHyLzGx731Zz8nvZrYCjWwEBD5AhzHQEH5eOiir6aWTMA2QaEjY7zzOakYVG36xzigA5X5B+TNi559EpuVPIbT80iHt99ec2WImudUCDnjC+3nAh3KYzhQQ7Wm9r0=
-    # ehuelsmann user uses Erik Huelsmann's keys
-    - secure: q9IckmvMBEEQ6EeM4U8K4y96Lx6tEaxs/A5GYUJxNJVhUkx3YqJKeERArZc4fpoV3CtUCFPDs/tktiFJn1LDeh3s9vJitUAGMU2AQxiUNARXK4EkEdPhvbX+CtusIIKDXYwEqXLiymv6mmpcc9/19CvHUzr9CiKZbb/LpS8lWqc=
-    - secure: cZKPTfU0h4rH2IIRr1Ds1XRPDrloe/K+menYm+VK54hE4MM2zTtNDmWn0fyPdeHeJDRrTF0pyobje8RG9E2Ld5YPHXve1/lVkieoPeqzm9V8hlvZlkgTQJiMAvKzjhSlUJx8AKPjX+jQZfhgAS1hnuWwOIB1cAA7fMpPJ7rPVWo=
+
+notifications:
+  webhooks: https://ledgersmb.org/webhook/travis_ci_notifications
+
 
 matrix:
   include:
-    - perl: '5.24'
+    - perl: '5.26'
       addons:
         postgresql: '9.6'
-        sauce_connect: true
         apt:
           packages:
             - nginx postgresql-9.6-pgtap
+            - texlive-latex-recommended
+            - texlive-xetex
       env:
-        - TEST_SAUCE=1
     - perl: '5.24'
       addons:
         postgresql: '9.5'
-        sauce_connect: true
         apt:
           packages:
             - nginx postgresql-9.5-pgtap
+            - texlive-latex-recommended
+            - texlive-xetex
       env:
-        - TEST_SAUCE=1
         - DOJO_BUILT=0
     - perl: '5.22'
       addons:
         postgresql: "9.4"
         apt:
           packages:
-            - nginx postgresql-9.4-pgtap
+             - nginx postgresql-9.4-pgtap
+             - texlive-latex-recommended
+             - texlive-xetex
       env:
         - COVERAGE=1
     - perl: '5.20'
@@ -50,6 +45,8 @@ matrix:
         apt:
           packages:
             - nginx postgresql-9.4-pgtap
+            - texlive-latex-recommended
+            - texlive-xetex
       env:
         - COA_TESTING=1
     - perl: '5.18'
@@ -58,22 +55,8 @@ matrix:
         apt:
           packages:
             - nginx postgresql-9.3-pgtap
-      env:
-        - DB_TESTING=1
-    - perl: '5.16'
-      addons:
-        postgresql: "9.2"
-        apt:
-          packages:
-            - nginx postgresql-9.2-pgtap
-      env:
-        - DB_TESTING=1
-    - perl: '5.14'
-      addons:
-        postgresql: "9.2"
-        apt:
-          packages:
-            - nginx postgresql-9.2-pgtap
+            - texlive-latex-recommended
+            - texlive-xetex
       env:
         - DB_TESTING=1
 
@@ -87,8 +70,10 @@ cache:
     - $HOME/dojo_archive
 
 before_install:
-  - source /opt/jdk_switcher/jdk_switcher.sh
-  - jdk_switcher use oraclejdk8
+  # list all the running services before we start. Perhaps we can stop some of them to save resources.
+  - service --status-all
+  # display the available resources
+  - utils/diagnostics/t/01-system-resources.t
   - phantomjs --version
   - export PATH=$HOME/travis_phantomjs/phantomjs-2.1.1-linux-x86_64/bin:$PATH
   - phantomjs --version
@@ -99,6 +84,7 @@ before_install:
       wget https://efficito.com/phantomjs/phantomjs-2.1.1-linux-x86_64.tar.bz2 -O $HOME/travis_phantomjs/phantomjs-2.1.1-linux-x86_64.tar.bz2 ;
       tar -xvf $HOME/travis_phantomjs/phantomjs-2.1.1-linux-x86_64.tar.bz2 -C $HOME/travis_phantomjs ;
       hash -r ;
+      export QT_QPA_PLATFORM=phantom
       phantomjs --version ;
     fi
   - git clone git://github.com/travis-perl/helpers ~/travis-perl-helpers
@@ -110,10 +96,10 @@ before_install:
   - export PATH="$HOME/locallib/bin:$PATH"
   - export PERL_MM_OPT="INSTALL_BASE=$HOME/locallib"
   - export PERL_MB_OPT="--install_base=$HOME/locallib"
-  - npm install uglify-js
+  - npm install uglify-js@">=2.0 <3.0"
 
 install:
-  - cpanm --quiet --notest --with-develop --with-feature=edi --with-feature=xls --installdeps .
+  - cpanm --quiet --notest --installdeps --with-develop --with-feature=edi --with-feature=latex-pdf-ps --with-feature=openoffice  --with-feature=starman --with-feature=xls .
   - cpan-install --coverage
 
 before_script:
@@ -121,38 +107,65 @@ before_script:
   - cd ${HOME}/built-dist
   - tar xzf tar-output/ledgersmb-travis.tar.gz
   - cd ledgersmb
-  - cp conf/ledgersmb.conf.default ledgersmb.conf
-  - coverage-setup 2>/dev/null
+  - cp doc/conf/ledgersmb.conf.default ledgersmb.conf
+  - cp t/.proverc ./
+  - coverage-setup
   - export DEVEL_COVER_OPTIONS=+ignore,"\.lttc\$"
-  - sed -e "s#{ROOT}#$PWD#" conf/nginx-travis.conf >/tmp/nginx.conf
+  - sed -e "s#{ROOT}#$PWD#" doc/conf/nginx-travis.conf >/tmp/nginx.conf
   - ((phantomjs --webdriver=4422 2>/dev/null >/dev/null &) && echo "PhantomJS started succesfully") || (echo "Failed to start PhantomJS!" ; exit 1)
-  - #PERL5OPT="$PERL5OPT $HARNESS_PERL_SWITCHES" plackup -Ilib --port 5001 --server HTTP::Server::PSGI tools/starman.psgi >/dev/null 2>/dev/null &
-  - PERL5OPT="$PERL5OPT $HARNESS_PERL_SWITCHES" plackup -Ilib --port 5001 --server HTTP::Server::PSGI tools/starman.psgi --access_log /tmp/plackup-access.log 2> /tmp/plackup-error.log &
-  - sleep 5  # give starman a chance to start
-  - utils/test/Is_LSMB_running.sh  # fail early if starman is not running
+  - #PERL5OPT="$PERL5OPT $HARNESS_PERL_SWITCHES" plackup -Ilib --port 5001 --server HTTP::Server::PSGI bin/ledgersmb-server.psgi >/dev/null 2>/dev/null &
+  - PERL5OPT="$PERL5OPT $HARNESS_PERL_SWITCHES" plackup -Ilib --port 5001 --server HTTP::Server::PSGI bin/ledgersmb-server.psgi --access_log /tmp/plackup-access.log 2> /tmp/plackup-error.log &
+  - utils/test/Is_LSMB_running.sh --early # fail early if starman is not running (can be skipped based on reponame or owner by setting an array in the script)
   - nginx -c /tmp/nginx.conf
   - if [ "${DOJO_BUILT}" != "" ]; then sed -i -e "s#dojo_built *= *(\d)+#dojo_built={dojo_built}#" ledgersmb.conf ; fi
+  # display the available resources
+  - utils/diagnostics/t/01-system-resources.t
 
 script:
   - RELEASE_TESTING=1
      PGUSER=postgres PGPASSWORD=test
      LSMB_TEST_DB=1 LSMB_NEW_DB=lsmbinstalltest
      LSMB_BASE_URL="http://127.0.0.1:5000"
+     PSGI_BASE_URL="http://127.0.0.1:5001"
      HARNESS_RULESFILE="t/testrules.yml"
-    prove -j9 -r --source Perl
-          --ext=.t --ext=.pg --ext=.feature
-          --source pgTAP   --pgtap-option dbname=lsmbinstalltest
-                           --pgtap-option username=postgres
-                           --pgtap-option suffix=.pg
-          --source Feature --feature-option extensions=.feature
-                           --feature-option tags=~@wip
+    prove --jobs $(test-jobs) --recurse
+          --pgtap-option dbname=lsmbinstalltest
+          --pgtap-option username=postgres
+          --feature-option tags=~@wip
           t/ xt/
 
 after_success:
   - >
-    if [ "$COVERAGE" != "0" ] ; then
+    if [ "$COVERAGE" == "1" ] ; then
        curl http://localhost:5001/stop.pl ;
-       while [ -n "$(jobs -r | grep starman.psgi)" ] ; do sleep 1; echo -n "." ; done ;
+       while [ -n "$(jobs -r | grep ledgersmb-server.psgi)" ] ; do sleep 1; echo -n "." ; done ;
        echo "" ;
     fi
   - coverage-report
+  # display the available resources
+  - utils/diagnostics/t/01-system-resources.t
+  # try and force the github camo.githubusercontent.com cache to refresh our badges
+  # with no arguments, this only refreshes the badge assests linked to by the default page shown when visiting
+  # https://github.com/ledgersmb/LedgerSMB
+  # if we want to refresh assets other than those (ie: not master branch) then we will need to add explicit arguments to do so
+  # the script is sourced from https://github.com/sbts/github-badge-cache-buster but isn't expected to change so there is no point making it a submodule
+  - utils/test/github-badge-cache-buster.sh
+
+after_failure:
+  # display the available resources
+  - utils/diagnostics/t/01-system-resources.t
+  - echo ===============================
+  - echo === dmesg                   ===
+  - echo ===============================
+  - cat /var/log/dmesg
+  # display the dmesg log. may give some hints about system related failures. eg: has the OOM killer triggered
+  - echo ===============================
+  - echo === /tmp/plackup-access.log ===
+  - echo ===============================
+  - cat /tmp/plackup-access.log
+  - echo
+  - echo ===============================
+  - echo === /tmp/plackup-error.log ===
+  - echo ===============================
+  - cat /tmp/plackup-error.log
+  - echo

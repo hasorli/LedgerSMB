@@ -1,6 +1,13 @@
+
+package LedgerSMB::Report::Listings::Warehouse;
+
 =head1 NAME
 
 LedgerSMB::Report::Listings::Warehouse - List warehouses in LedgerSMB
+
+=head1 DESCRIPTION
+
+Implements an unfiltered listing of warehouses.
 
 =head1 SYNOPSIS
 
@@ -10,8 +17,8 @@ Since no parameters are required:
 
 =cut
 
-package LedgerSMB::Report::Listings::Warehouse;
 use Moose;
+use namespace::autoclean;
 extends 'LedgerSMB::Report';
 
 =head1 REPORT CRITERIA
@@ -67,10 +74,10 @@ sub run_report {
     for my $row(@rows){
         $row->{row_id} = $row->{id};
     }
-    $self->rows(\@rows);
+    return $self->rows(\@rows);
 }
 
-=head1 COPYRIGHT
+=head1 LICENSE AND COPYRIGHT
 
 Copyright(C) 2013 The LedgerSMB Core Team.  This file may be used in accordance
 with the GNU General Public License version 2 or at your option any later

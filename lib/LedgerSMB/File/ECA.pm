@@ -1,12 +1,15 @@
-=pod
+
+package LedgerSMB::File::ECA;
 
 =head1 NAME
 
 LedgerSMB::File::ECA - Manages attachments to customers and vendors
 
-=head1 SYNOPSIS
+=head1 DESCRIPTION
 
-TODO
+Derived from C<LedgerSMB::File>, this module stores file data in
+the C<file_eca> table, attached to records from the
+C<entity_credit_account> table, which stores customers and vendors.
 
 =head1 INHERITS
 
@@ -21,8 +24,8 @@ methods only
 
 =cut
 
-package LedgerSMB::File::ECA;
 use Moose;
+use namespace::autoclean;
 extends 'LedgerSMB::File';
 
 =head1 METHODS
@@ -37,12 +40,12 @@ Attaches or links a specific file to the given transaction.
 
 sub attach {
     my ($self, $args) = @_;
-    $self->call_dbmethod(funcname => 'file__attach_to_eca');
+    return $self->call_dbmethod(funcname => 'file__attach_to_eca');
 }
 
 =back
 
-=head1 COPYRIGHT
+=head1 LICENSE AND COPYRIGHT
 
 Copyright (C) 2011 The LedgerSMB Core Team
 
@@ -52,4 +55,5 @@ your software.
 
 =cut
 
+__PACKAGE__->meta->make_immutable;
 1;

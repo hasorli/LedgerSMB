@@ -1,3 +1,1 @@
-# default arguments for the 'prove' command
--l
--Iold/lib/
+t/.proverc

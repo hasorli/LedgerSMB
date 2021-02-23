@@ -1,3 +1,6 @@
+
+package LedgerSMB::Report::Assets::Net_Book_Value;
+
 =head1 NAME
 
 LedgerSMB::Report::Assets::Net_Book_Value - Fixed Asset Current Book Value
@@ -18,8 +21,8 @@ asset accounts.
 
 =cut
 
-package LedgerSMB::Report::Assets::Net_Book_Value;
 use Moose;
+use namespace::autoclean;
 extends 'LedgerSMB::Report';
 
 =head1 CRITERIA PROPERTIES
@@ -67,7 +70,7 @@ sub columns {
 
           {type => 'href',
          col_id => 'tag',
-      href_base => 'asset.pl?action=ed&id=',
+      href_base => 'asset.pl?action=asset_edit&id=',
            name =>  LedgerSMB::Report::text('Tag'),},
 
           {type => 'text',
@@ -130,7 +133,7 @@ Net Book Value
 =cut
 
 sub name {
-    return LedgerSMB::Report->text('Net Book Value');
+    return LedgerSMB::Report::text('Net Book Value');
 }
 
 =head1 METHODS
@@ -145,10 +148,10 @@ sub run_report{
     for my $row(@rows){
         $row->{row_id} = $row->{id};
     }
-    $self->rows(\@rows);
+    return $self->rows(\@rows);
 }
 
-=head1 COPYRIGHT
+=head1 LICENSE AND COPYRIGHT
 
 COPYRIGHT (C) 2013 The LedgerSMB Core Team.  This file may be re-used under the
 terms of the LedgerSMB General Public License version 2 or at your option any

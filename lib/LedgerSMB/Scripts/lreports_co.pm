@@ -1,8 +1,11 @@
+
+package LedgerSMB::Scripts::lreports_co;
+
 =head1 NAME
 
 LedgerSMB::Scripts::lreports_co - Colombian local reports
 
-=head1 SYNOPSIS
+=head1 DESCRIPTION
 
 This module holds Colombia-specific reports.
 
@@ -10,9 +13,6 @@ This module holds Colombia-specific reports.
 
 =cut
 
-package LedgerSMB::Scripts::lreports_co;
-
-use LedgerSMB;
 use LedgerSMB::Template;
 use LedgerSMB::Report::co::Caja_Diaria;
 use LedgerSMB::Report::co::Balance_y_Mayor;
@@ -40,7 +40,7 @@ sub start_caja_diaria {
         template => 'filter_cd',
         format => 'HTML'
     );
-    return $template->render_to_psgi($request);
+    return $template->render($request);
 }
 
 =item start_bm
@@ -58,7 +58,7 @@ sub start_bm {
         template => 'filter_bm',
         format => 'HTML'
     );
-    return $template->render_to_psgi($request);
+    return $template->render($request);
 }
 
 =item run_caja_diaria
@@ -71,7 +71,7 @@ sub run_caja_diaria {
     my ($request) = @_;
     my $report = LedgerSMB::Report::co::Caja_Diaria->new(%$request);
     $report->run_report;
-    return $report->render_to_psgi($request);
+    return $report->render($request);
 }
 
 =item run_bm
@@ -84,19 +84,34 @@ sub run_bm {
     my ($request) = @_;
     my $report = LedgerSMB::Report::co::Balance_y_Mayor->new(%$request);
     $report->run_report;
-    return $report->render_to_psgi($request);
+    return $report->render($request);
 }
+
+
+{
+    local ($!, $@) = ( undef, undef);
+    my $do_ = 'scripts/custom/lreports_co.pl';
+    if ( -e $do_ ) {
+        unless ( do $do_ ) {
+            if ($! or $@) {
+                warn "\nFailed to execute $do_ ($!): $@\n";
+                die (  "Status: 500 Internal server error (lreports_co.pm)\n\n" );
+            }
+        }
+    }
+};
 
 =back
 
-=head1 Copyright (C) 2007 The LedgerSMB Core Team
+=head1 LICENSE AND COPYRIGHT
 
-Licensed under the GNU General Public License version 2 or later (at your
-option).  For more information please see the included LICENSE and COPYRIGHT
-files.
+Copyright (C) 2007-2018 The LedgerSMB Core Team
+
+This file is licensed under the Gnu General Public License version 2, or at your
+option any later version.  A copy of the license should have been included with
+your software.
 
 =cut
 
-###TODO-LOCALIZE-DOLLAR-AT
-eval { do "scripts/custom/lreports_co.pl"};
+
 1;

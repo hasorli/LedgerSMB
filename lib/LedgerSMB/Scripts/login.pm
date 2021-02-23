@@ -1,11 +1,11 @@
 
-=pod
+package LedgerSMB::Scripts::login;
 
 =head1 NAME
 
 LedgerSMB:Scripts::login - web entry points for session creation/termination
 
-=head1 SYNOPSIS
+=head1 DESCRIPTION
 
 This script contains the request handlers for logging in and out of LedgerSMB.
 
@@ -16,14 +16,14 @@ This script contains the request handlers for logging in and out of LedgerSMB.
 =cut
 
 
-package LedgerSMB::Scripts::login;
-
 use LedgerSMB::Locale;
-use LedgerSMB;
-use LedgerSMB::User;
-use LedgerSMB::Auth;
+use HTTP::Status qw( HTTP_OK ) ;
+
+use LedgerSMB::PSGI::Util;
 use LedgerSMB::Scripts::menu;
 use LedgerSMB::Sysconfig;
+use LedgerSMB::User;
+
 use Try::Tiny;
 
 use strict;
@@ -39,7 +39,31 @@ a request object /not/ connected to the database.
 =cut
 
 sub no_db_actions {
-    return qw(logout authenticate __default logout_js);
+    return qw(__default logout_js);
+}
+
+=item dbonly_actions
+
+Returns an array of actions which should not receive
+a request object /not/ connected to the database.
+
+=cut
+
+sub dbonly_actions {
+    return qw(logout authenticate);
+}
+
+
+=item clear_session_actions
+
+Returns an array of actions which should have the session
+(cookie) cleared before verifying the session and being
+dispatched to.
+
+=cut
+
+sub clear_session_actions {
+    return qw(__default authenticate);
 }
 
 =item __default (no action specified, do this)
@@ -51,98 +75,39 @@ Displays the login screen.
 sub __default {
     my ($request) = @_;
 
-    if ($request->{cookie} && $request->{cookie} ne 'Login') {
-        if (! $request->_db_init()) {
-            return [ 401,
-                     [ 'WWW-Authenticate' => 'Basic realm=LedgerSMB',
-                       'Content-Type' => 'text/plain; charset=utf-8' ],
-                     [ 'Please provide your credentials.' ]];
-        }
-        if (! $request->verify_session()) {
-            return [ 303,
-                     [ 'Location' => 'login.pl?action=logout&reason=timeout' ],
-                     [ '<html><body><h1>Session expired</h1></body></html>' ] ];
-        }
-        $request->initialize_with_db();
-        return LedgerSMB::Scripts::menu::root_doc($request);
-    }
-
-    my $secure = '';
-
-    # copy of code in LedgerSMB::Session
-    my $path = $ENV{SCRIPT_NAME};
-    $path =~ s|[^/]*$||;
-
-    my $cookie_name = $LedgerSMB::Sysconfig::cookie_name;
-    if ($ENV{SERVER_PORT} == 443){
-        $secure = ' Secure;';
-    }
-    $request->{_new_session_cookie_value} =
-        qq|$cookie_name=Login; path=$path;$secure|;
-    $request->{stylesheet} = "ledgersmb.css";
+    $request->{stylesheet} = 'ledgersmb.css';
     $request->{titlebar} = "LedgerSMB $request->{VERSION}";
-    my $template = LedgerSMB::Template->new(
-        user =>$request->{_user},
-        locale => $request->{_locale},
-        path => 'UI',
+    my $template = LedgerSMB::Template->new_UI(
+        $request,
         template => 'login',
-        format => 'HTML'
     );
-    return $template->render_to_psgi($request);
+    return $template->render($request);
 }
 
 =item authenticate
 
 This routine checks for the authentication information and if successful
-sends either a 302 redirect or a 200 successful response.
+sends either a HTTP_FOUND redirect or a HTTP_OK successful response.
 
-If unsuccessful sends a 401 if the username/password is bad, or a 454 error
-if the database does not exist.
+If unsuccessful sends a HTTP_UNAUTHORIZED if the username/password is bad,
+or a HTTP_454 error if the database does not exist.
 
 =cut
 
 sub authenticate {
     my ($request) = @_;
-    if (!$request->{dbh}){
-        if (!$request->{company}){
-             $request->{company} = $LedgerSMB::Sysconfig::default_db;
-        }
-        if (! $request->_db_init) {
-            return [ 401,
-                     [ 'WWW-Authenticate' => 'Basic realm=LedgerSMB',
-                       'Content-Type' => 'text/plain; charset=utf-8' ],
-                     [ 'Please provide your credentials.' ]];
-        }
-    }
-    my $path = $ENV{SCRIPT_NAME};
-    $path =~ s|[^/]*$||;
 
-    if ($request->{dbh} and !$request->{log_out}){
+    $request->{company} ||= $LedgerSMB::Sysconfig::default_db;
 
-        if (!$request->{dbonly}
-            && ! LedgerSMB::Session::check($request->{cookie}, $request)) {
-            return [ 401,
-                     [ 'WWW-Authenticate' => 'Basic realm=LedgerSMB',
-                       'Content-Type' => 'text/plain; charset=utf-8' ],
-                     [ 'Please provide your credentials.' ] ];
-        }
-        return [ 200,
-                 [ 'Content-Type' => 'text/plain; charset=utf-8' ],
-                 [ 'Success' ] ];
+
+    if (!$request->{dbonly}
+        && ! $request->{_create_session}->()) {
+        return LedgerSMB::PSGI::Util::unauthorized();
     }
-    else {
-        if (($request->{_auth_error} )
-            && ($request->{_auth_error} =~/$LedgerSMB::Sysconfig::no_db_str/i)) {
-            return [ '454 Database Does Not Exist',
-                     [ 'Content-Type' => 'text/plain; charset=utf-8' ],
-                     [ 'Database does not exist' ] ];
-        } else {
-            return [ 401,
-                     [ 'WWW-Authenticate' => 'Basic realm=LedgerSMB',
-                       'Content-Type' => 'text/plain; charset=utf-8' ],
-                     [ 'Please enter your credentials.' ] ];
-        }
-    }
+
+    return [ HTTP_OK,
+             [ 'Content-Type' => 'text/plain; charset=utf-8' ],
+             [ 'Success' ] ];
 }
 
 =item login
@@ -155,9 +120,9 @@ sub login {
     my ($request) = @_;
 
     if (!$request->{_user}){
-        __default($request);
+        return __default($request);
     }
-    require LedgerSMB::Scripts::menu;
+
     return LedgerSMB::Scripts::menu::root_doc($request);
 }
 
@@ -171,21 +136,14 @@ Firefox, Opera, and Internet Explorer are all supported.  Not sure about Chrome
 
 sub logout {
     my ($request) = @_;
-    $request->{callback}   = "";
-    $request->{endsession} = 1;
+    $request->{callback}   = '';
 
-    try { # failure only means we clear out the session later
-        $request->_db_init();
-        LedgerSMB::Session::destroy($request);
-    };
-    my $template = LedgerSMB::Template->new(
-        user =>$request->{_user},
-        locale => $request->{_locale},
-        path => 'UI',
+    $request->{_logout}->();
+    my $template = LedgerSMB::Template->new_UI(
+        $request,
         template => 'logout',
-        format => 'HTML'
     );
-    return $template->render_to_psgi($request);
+    return $template->render($request);
 }
 
 =item logout_js
@@ -197,25 +155,32 @@ requiring only bogus credentials (logout:logout).
 
 sub logout_js {
     my $request = shift @_;
-    my $creds = LedgerSMB::Auth::get_credentials();
-    return [ 401,
-             [ 'WWW-Authenticate' => 'Basic realm=LedgerSMB',
-               'Content-Type' => 'text/plain; charset=utf-8' ],
-             [ 'Please enter your credentials.' ] ]
-                 unless (($creds->{password} eq 'logout')
-                         and ($creds->{login} eq 'logout'));
+    my $creds = $request->{_auth}->get_credentials;
+    return LedgerSMB::PSGI::Util::unauthorized()
+        unless (($creds->{password} eq 'logout')
+                and ($creds->{login} eq 'logout'));
     return logout($request);
 }
 
 
-###TODO-LOCALIZE-DOLLAR-AT
-eval { do "scripts/custom/login.pl"};
+{
+    local ($!, $@) = ( undef, undef);
+    my $do_ = 'scripts/custom/login.pl';
+    if ( -e $do_ ) {
+        unless ( do $do_ ) {
+            if ($! or $@) {
+                warn "\nFailed to execute $do_ ($!): $@\n";
+                die (  "Status: 500 Internal server error (login.pm)\n\n" );
+            }
+        }
+    }
+};
 
 =back
 
-=head1 COPYRIGHT
+=head1 LICENSE AND COPYRIGHT
 
-Copyright (C) 2009 LedgerSMB Core Team.  This file is licensed under the GNU
+Copyright (C) 2009-2017 LedgerSMB Core Team. This file is licensed under the GNU
 General Public License version 2, or at your option any later version.  Please
 see the included License.txt for details.
 

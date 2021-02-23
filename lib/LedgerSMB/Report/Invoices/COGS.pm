@@ -1,3 +1,6 @@
+
+package LedgerSMB::Report::Invoices::COGS;
+
 =head1 NAME
 
 LedgerSMB::Report::Invoices::COGS - FIFO COGS Reports for LedgerSMB
@@ -8,7 +11,6 @@ LedgerSMB::Report::Invoices::COGS - FIFO COGS Reports for LedgerSMB
 
 =cut
 
-package LedgerSMB::Report::Invoices::COGS;
 use namespace::autoclean;
 use Moose;
 extends 'LedgerSMB::Report';
@@ -167,7 +169,7 @@ Line Item COGS Report
 
 =cut
 
-sub name { LedgerSMB::Report::text('Line Item COGS Report'); }
+sub name { return LedgerSMB::Report::text('Line Item COGS Report'); }
 
 =head1 METHODS
 
@@ -184,10 +186,10 @@ sub run_report {
         $row->{partnumber_href_suffix} = $row->{parts_id};
         $row->{invnumber_href_suffix} = $row->{trans_id};
     }
-    $self->rows(\@rows);
+    return $self->rows(\@rows);
 }
 
-=head1 COPYRIGHT
+=head1 LICENSE AND COPYRIGHT
 
 Copyright (C) 2014 The LedgerSMB Core Team
 

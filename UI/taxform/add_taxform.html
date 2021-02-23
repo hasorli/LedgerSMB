@@ -1,10 +1,3 @@
-<?lsmb INCLUDE "ui-header.html"
-        titlebar = text('Add TaxForm') # '
-        stylesheet = stylesheet
-        include_stylesheet = [
-                "css/scripts/create_batch.css"
-        ]
-?>
 <?lsmb PROCESS 'elements.html'  # Include form elements helper. ?>
 <body class="lsmb <?lsmb dojo_theme ?>">
 <?lsmb IF id;
@@ -13,7 +6,10 @@
           title = text('Create New Tax Form'); #'
        END ?>
 <div class="listtop"><?lsmb title ?></div>
-<form data-dojo-type="lsmb/Form" name="add_taxform" method="post">
+<form data-dojo-type="lsmb/Form"
+      name="add_taxform"
+      method="post"
+      action="<?lsmb script ?>">
 <?lsmb PROCESS input element_data = {
     type = "hidden"
     name = "id"
@@ -102,4 +98,3 @@
 
 </form>
 </body>
-</html>

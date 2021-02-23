@@ -1,26 +1,23 @@
 
+package LedgerSMB::Scripts::journal;
+
 =head1 NAME
 
-LedgerSMB::Scripts::journal - LedgerSMB slim ajax script for journal's
-account search request.
+LedgerSMB::Scripts::journal - Web entrypoint for ajax account search.
 
-=head1 SYNOPSIS
+=head1 DESCRIPTION
 
-A script for journal ajax requests: accepts a search string and returns a
+A script for ajax requests: accepts a search string and returns a
 list of matching accounts in a ul/li pair
 
 =head1 METHODS
 
 =cut
 
-package LedgerSMB::Scripts::journal;
-
-use LedgerSMB;
 use LedgerSMB::Template;
 use LedgerSMB::Business_Unit;
 use LedgerSMB::Report::GL;
 use LedgerSMB::Report::COA;
-use LedgerSMB::REST_Format::json;
 use strict;
 use warnings;
 
@@ -48,10 +45,7 @@ sub chart_json {
         grep { (! $label) || $_->{label} =~ m/\Q$label\E/i }
         map { $_->{label} = $_->{accno} . '--' . $_->{description}; $_ }
         @results;
-    my $json = LedgerSMB::REST_Format::json->to_output(\@results);
-    return [ 200,
-             [ 'Content-Type' => 'application/json; charset=UTF-8' ],
-             [ $json ] ];
+    return $request->to_json(\@results);
 }
 
 =item chart_of_accounts
@@ -72,7 +66,7 @@ sub chart_of_accounts {
     }
     my $report = LedgerSMB::Report::COA->new(%$request);
     $report->run_report();
-    return $report->render_to_psgi($request);
+    return $report->render($request);
 }
 
 =item delete_account
@@ -107,7 +101,7 @@ sub search {
                if $request->{"business_unit_$count"};
     }
     #tshvr4 trying to mix in period from_month from_year interval
-    return LedgerSMB::Report::GL->new(%$request)->render_to_psgi($request);
+    return LedgerSMB::Report::GL->new(%$request)->render($request);
 }
 
 =item search_purchases
@@ -126,19 +120,34 @@ sub search_purchases {
     }
     my $report = LedgerSMB::Report::Contact::Purchase->new(%$request);
     $report->run_report;
-    return $report->render_to_psgi($request);
+    return $report->render($request);
 }
+
+
+{
+    local ($!, $@) = (undef, undef);
+    my $do_ = 'scripts/custom/journal.pl';
+    if ( -e $do_ ) {
+        unless ( do $do_ ) {
+            if ($! or $@) {
+                warn "\nFailed to execute $do_ ($!): $@\n";
+                die (  "Status: 500 Internal server error (journal.pm)\n\n" );
+            }
+        }
+    }
+};
 
 =back
 
-=head1 Copyright (C) 2007 The LedgerSMB Core Team
+=head1 LICENSE AND COPYRIGHT
 
-Licensed under the GNU General Public License version 2 or later (at your
-option).  For more information please see the included LICENSE and COPYRIGHT
-files.
+Copyright (C) 2011-2018 The LedgerSMB Core Team
+
+This file is licensed under the Gnu General Public License version 2, or at your
+option any later version.  A copy of the license should have been included with
+your software.
 
 =cut
 
-###TODO-LOCALIZE-DOLLAR-AT
-eval { do "scripts/custom/journal.pl"};
+
 1;

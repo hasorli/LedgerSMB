@@ -1,3 +1,6 @@
+
+package LedgerSMB::Scripts::timecard;
+
 =head1 NAME
 
 LedgerSMB::Scripts::timecard - LedgerSMB workflow routines for timecards.
@@ -12,9 +15,13 @@ This module contains the basic workflow scripts for managing timecards for
 LedgerSMB.  Timecards are used to track time and materials consumed in the
 process of work, from professional services to payroll and manufacturing.
 
+=head1 METHODS
+
+This module does not specify any methods.
+
 =cut
 
-package LedgerSMB::Scripts::timecard;
+
 use LedgerSMB::Template;
 use LedgerSMB::Timecard;
 use LedgerSMB::Timecard::Type;
@@ -22,11 +29,11 @@ use LedgerSMB::Report::Timecards;
 use LedgerSMB::Company_Config;
 use LedgerSMB::Business_Unit_Class;
 use LedgerSMB::Business_Unit;
+use LedgerSMB::Magic qw( MIN_PER_HOUR SEC_PER_HOUR SUNDAY SATURDAY );
 use LedgerSMB::Setting;
 use DateTime;
 use strict;
 use warnings;
-
 
 =head1 ROUTINES
 
@@ -57,7 +64,7 @@ sub new {
         path     => 'UI/timecards',
         template => 'entry_filter',
         format   => 'HTML'
-    )->render_to_psgi($request);
+    )->render($request);
 }
 
 =item display
@@ -72,9 +79,9 @@ sub display {
     $request->{non_billable} ||= 0;
     if ($request->{in_hour} and $request->{in_min}) {
         my $request->{min_used} =
-            ($request->{in_hour} * 60) + $request->{in_min} -
-            ($request->{out_hour} * 60) - $request->{out_min};
-        $request->{qty} = $request->{min_used}/60 - $request->{non_billable};
+            ($request->{in_hour} * MIN_PER_HOUR) + $request->{in_min} -
+            ($request->{out_hour} * MIN_PER_HOUR) - $request->{out_min};
+        $request->{qty} = $request->{min_used}/MIN_PER_HOUR - $request->{non_billable};
     } else { # Default to current date and time
         my $now = DateTime->now;
         $request->{in_hour} = $now->hour unless defined $request->{in_hour};
@@ -93,7 +100,7 @@ sub display {
          template => 'timecard',
          format   => 'HTML'
      );
-     return $template->render_to_psgi($request);
+     return $template->render($request);
 }
 
 =item timecard_screen
@@ -116,11 +123,8 @@ sub timecard_screen {
          my $startdate = LedgerSMB::PGDate->from_input($request->{date_from});
 
          my @dates = ();
-         for (0 .. 6){
-            push @dates, LedgerSMB::PGDate->from_db(
-                    $startdate->add(days => 1)->strftime('%Y-%m-%d'),
-                    'date'
-            );
+         for (SUNDAY .. SATURDAY){
+             push @dates, $startdate->add(days => 1)->clone;
          }
          $request->{num_lines} = 1 unless $request->{num_lines};
          $request->{transdates} = \@dates;
@@ -131,7 +135,7 @@ sub timecard_screen {
              template => 'timecard-week',
              format   => 'HTML'
          );
-         return $template->render_to_psgi($request);
+         return $template->render($request);
     }
 }
 
@@ -164,7 +168,7 @@ sub _get_qty {
     my ($checkedin, $checkedout) = @_;
     my $when_in = LedgerSMB::PGDate->from_input($checkedin);
     my $when_out = LedgerSMB::PGDate->from_input($checkedout);
-    return ($when_in->epoch - $when_out->epoch) / 3600;
+    return ($when_in->epoch - $when_out->epoch) / SEC_PER_HOUR;
 }
 
 =item save_week
@@ -176,7 +180,7 @@ Saves a week of timecards.
 sub save_week {
     my $request = shift @_;
     for my $row(1 .. $request->{rowcount}){
-        for my $dow (0 .. 6){
+        for my $dow (SUNDAY  .. SATURDAY){
             my $date = $request->{"transdate_$dow"};
             my $hash = { transdate => LedgerSMB::PGDate->from_input($date),
                          checkedin => LedgerSMB::PGDate->from_input($date), };
@@ -213,15 +217,15 @@ sub print {
         locale   => $request->{_locale},
         path     => $LedgerSMB::Company_Config::settings->{templates},
         template => 'timecard',
-        no_auto_output => 1,
-        format   => $request->{format} || 'HTML'
+        format   => $request->{format} || 'HTML',
+        output_options => {
+           filename => 'timecard-' . $request->{id}
+                            . '.' . lc($request->{format} || 'HTML')
+        }
     );
 
     if (lc($request->{media}) eq 'screen') {
-        return $template->render_to_psgi($request,
-            extra_headers => [ 'Content-Disposition' =>
-                  'attachment; filename="timecard-' . $request->{id}
-                            . '.' . lc($request->{format} || 'HTML') . '"' ]);
+        return $template->render($request);
     }
     else {
         $template->render($request);
@@ -240,7 +244,7 @@ This generates a report of timecards.
 sub timecard_report{
     my ($request) = @_;
     my $report = LedgerSMB::Report::Timecards->new(%$request);
-    return $report->render_to_psgi($request);
+    return $report->render($request);
 }
 
 =item generate_order
@@ -252,6 +256,7 @@ This routine generates an order based on timecards
 sub generate_order {
     my ($request) = @_;
     # TODO after beta 1
+    return;
 }
 
 =item get
@@ -291,7 +296,7 @@ sub get {
 
 =back
 
-=head1 COPYRIGHT
+=head1 LICENSE AND COPYRIGHT
 
 COPYRIGHT (C) 2012 The LedgerSMB Core Team.  This file may be re-used under the
 terms of the LedgerSMB General Public License version 2 or at your option any

@@ -1,28 +1,29 @@
+
+package LedgerSMB::PGDate;
+
 =head1 NAME
 
 LedgerSMB::PgDate - Date handling and serialization to database
 
+=head1 DESCRIPTION
+
+This class handles formatting and mapping between the DateTime module and
+PostgreSQL. It provides a handler for date and timestamp datatypes.
+
+The type behaves internally as a Datetime module.
+
 =cut
 
-package LedgerSMB::PGDate;
 use DateTime::Format::Strptime;
 use LedgerSMB::App_State;
+use LedgerSMB::Magic qw( MONTHS_PER_QUARTER YEARS_PER_CENTURY FUTURE_YEARS_LIMIT );
 use Carp;
 use PGObject;
 use base qw(PGObject::Type::DateTime);
 use strict;
 use warnings;
 
-PGObject->register_type(pg_type => $_,
-                                  perl_class => __PACKAGE__)
-   for ('date');
-
-
-=head1 SYNPOSIS
-This class handles formatting and mapping between the DateTime module and
-PostgreSQL. It provides a handler for date and timestamp datatypes.
-
-The type behaves internally as a Datetime module.
+__PACKAGE__->register(registry => 'default', types => ['date']);
 
 =head1 SUPPORTED FORMATS
 
@@ -103,10 +104,10 @@ my $regexes = {
                         fields => [ 'day', 'month', 'year' ] },
                     ],
     'DD/MM/YYYY' => [ { regex => qr/^(\d\d)\/(\d\d)\/(\d{4,4})$/,
-                        fields => [ 'month', 'day', 'year' ] },
+                        fields => [ 'day', 'month', 'year' ] },
                       { regex => qr/^(\d\d)\/(\d\d)\/(\d\d)$/,
                         short_year => 1,
-                        fields => [ 'month', 'day', 'year' ] },
+                        fields => [ 'day', 'month', 'year' ] },
                     ],
     'MM-DD-YYYY' => [ { regex => qr/^(\d\d)\-(\d\d)\-(\d{4,4})$/,
                         fields => [ 'month', 'day', 'year' ] },
@@ -213,7 +214,7 @@ sub add_interval {
     die "Bad interval: $interval" if not defined $delta_name;
 
     $n //= 1;    # Default to 1
-    $n *= 3 if $interval eq 'quarter'; # A quarter is 3 months
+    $n *= MONTHS_PER_QUARTER if $interval eq 'quarter'; # A quarter is 3 months
 
     my $has_time = $self->is_time();
     $self->add($delta_name => $n, end_of_month => 'preserve');
@@ -230,10 +231,10 @@ Parses this from an input string according to the user's dateformat
 
 sub from_input{
     my ($self, $input) = @_;
-    {
-        local $@;
-        return $input if eval {$input->isa(__PACKAGE__)} && $input->is_date;
-    }
+
+    local $@ = undef;
+    return $input if eval {$input->isa(__PACKAGE__)} && $input->is_date;
+
     return __PACKAGE__->new()
         if ! $input; # matches undefined as well as ''
 
@@ -250,10 +251,10 @@ sub from_input{
         }
         if ($fmt->{short_year}) {
             my $year = DateTime->today()->year();
-            my $short_year = $year % 100;
+            my $short_year = $year % YEARS_PER_CENTURY;
             my $century = $year - $short_year;
 
-            if ($args{year} > ($short_year+20)) {
+            if ($args{year} > ($short_year+FUTURE_YEARS_LIMIT)) {
                 $args{year} += ($century-1);
             }
             else {
@@ -296,13 +297,13 @@ sub to_output {
     $fmt .= ' %T' if $self->is_time();
     $fmt =~ s/^\s+//;
 
-    my $formatter = new DateTime::Format::Strptime(
+    my $formatter = DateTime::Format::Strptime->new(
              pattern => $fmt,
               locale => 'en_US',
             on_error => 'croak',
     );
     my $date = $formatter->format_datetime($self);
-    if ($date =~ /\:/ and not $self->is_time()) { die "to_output"; }
+    if ($date =~ /\:/ and not $self->is_time()) { die 'to_output'; }
     return $date;
 }
 
@@ -319,12 +320,17 @@ sub to_sort {
 
 #__PACKAGE__->meta->make_immutable;
 
-1;
-
 =back
 
-=head1 Copyright (C) 2011, The LedgerSMB core team.
+=head1 LICENSE AND COPYRIGHT
+
+Copyright (C) 2011-2018 The LedgerSMB Core Team
 
 This file is licensed under the Gnu General Public License version 2, or at your
 option any later version.  A copy of the license should have been included with
 your software.
+
+=cut
+
+
+1;

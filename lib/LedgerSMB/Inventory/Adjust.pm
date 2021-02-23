@@ -1,3 +1,6 @@
+
+package LedgerSMB::Inventory::Adjust;
+
 =head1 NAME
 
 LedgerSMB::Inventory::Adjust - Inventory Adjustments for LedgerSMB
@@ -11,13 +14,13 @@ LedgerSMB::Inventory::Adjust - Inventory Adjustments for LedgerSMB
 
 =cut
 
-package LedgerSMB::Inventory::Adjust;
 use Moose;
+use namespace::autoclean;
 with 'LedgerSMB::PGObject';
 use LedgerSMB::MooseTypes;
 use LedgerSMB::Inventory::Adjust_Line;
 
-sub _get_prefix { 'inventory_adjust__' }
+sub _get_prefix { return 'inventory_adjust__' }
 
 =head1 DESCRIPTION
 
@@ -88,6 +91,37 @@ has rows => (is => 'rw',
 
 =back
 
+=head1 CONSTRUCTORS
+
+=over
+
+=item new
+
+This constructor is the standard Moose constructor.
+
+=item get( key => { id => $id } )
+
+This constructor retrieves the adjustment with primary key C<id> equal to
+C<$id> from the database and returns a C<LedgerSMB::Inventory::Adjust>
+instance.
+
+=back
+
+=cut
+
+sub get {
+    my $class = shift;
+    my %args = @_;
+
+    my @dblines = __PACKAGE__->call_dbmethod( funcname => 'get_lines',
+                                                args => $args{key} );
+    my @lines = map { LedgerSMB::Inventory::Adjust_Line->new(%$_) } @dblines;
+
+    my ($values) = __PACKAGE__->call_dbmethod( funcname => 'get',
+                                               args => $args{key} );
+    return __PACKAGE__->new(%$values, rows => \@lines);
+}
+
 =head1 METHODS
 
 =over
@@ -101,45 +135,11 @@ routines and the like.
 
 sub add_line{
     my ($self, $hashref) = @_;
-    return if !$hashref->{partnumber} and !$hashref->{parts_id};
+    return if not $hashref->{partnumber} and not $hashref->{parts_id};
     my $line = LedgerSMB::Inventory::Adjust_Line->new(%$hashref);
     my @lines = @{$self->rows};
     push @lines, $line;
-    $self->rows(\@lines);
-}
-
-=item lines_from_form
-
-This function flattens a form.  It loops from 1 to $hashref->{rowcount}, and
-for each item found, checks for parts_id_$_ and partnumber_$_.  If either is
-found and counted_$_ is found, it creates a new line with the indexed keys of
-parts_id, partnumber, counted, and expected.
-
-Note that expected is optional and if not defined gets calculated based on the
-date of the report.   This happens during the save process.
-
-This then appends the lines onto the current report's @rows in order to ensure
-that many different sources could be combined together in this way.
-
-=cut
-
-sub lines_from_form {
-    my ($self, $hashref) = @_;
-    my @lines;
-    for my $ln (1 .. $hashref->{rowcount}){
-        next
-          if $hashref->{"id_$ln"} eq 'new';
-        my $line = LedgerSMB::Inventory::Adjust_Line->new(
-          parts_id => $hashref->{"id_$ln"},
-         partnumber => $hashref->{"partnumber_$ln"},
-            counted => $hashref->{"counted_$ln"},
-           expected => $hashref->{"onhand_$ln"},
-           variance => $hashref->{"onhand_$ln"} - $hashref->{"counted_$ln"});
-        push @lines, $line;
-    }
-    my $rows = $self->rows;
-    push @$rows, @lines;
-    $self->rows($rows);
+    return $self->rows(\@lines);
 }
 
 =item save
@@ -157,6 +157,7 @@ sub save {
         $row->check_variance($self->transdate);
         $row->save($self->id);
     }
+    return;
 }
 
 =item approve
@@ -169,6 +170,7 @@ These can then be approved, adjusted, have payment lines recorded, and the like.
 sub approve {
     my ($self) = @_;
     my ($ref) = $self->call_dbmethod(funcname => 'approve');
+    return;
 };
 
 
@@ -182,6 +184,7 @@ adjustment is not approved.
 sub delete {
     my ($self) = @_;
     my ($ref) = $self->call_dbmethod(funcname => 'delete');
+    return;
 }
 
 =item get_part_at_date
@@ -201,7 +204,7 @@ sub get_part_at_date {
 
 =back
 
-=head1 COPYRIGHT
+=head1 LICENSE AND COPYRIGHT
 
 COPYRIGHT (C) 2013 The LedgerSMB Core Team.  This file may be re-used under the
 terms of the LedgerSMB General Public License version 2 or at your option any

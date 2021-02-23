@@ -1,7 +1,3 @@
-<?lsmb
-INCLUDE 'ui-header.html'
-    include_stylesheet =  ['accounts/edit.css']
-?>
 <?lsmb PROCESS elements.html ?>
 <body class="lsmb <?lsmb dojo_theme ?>">
 <div id="account-tabs"
@@ -98,7 +94,7 @@ INCLUDE 'ui-header.html'
         name = 'charttype'
         type = 'hidden'
 } ?>
-<div class="inputline" id="accno-line">
+<div class="inputline" id="accno-line2">
   <label class="line"><?lsmb text('Account Number') ?></label>
   <div class="inputgroup">
     <?lsmb
@@ -127,7 +123,7 @@ INCLUDE 'ui-header.html'
 
 </div>
 <?lsmb END #  IF ID ?>
-<div class="inputline" id="desc-line">
+<div class="inputline" id="desc-line2">
    <label class="line"><?lsmb text('Description') ?></label>
    <div class="inputgroup">
       <?lsmb
@@ -140,7 +136,7 @@ INCLUDE 'ui-header.html'
     } ?>
    </div>
 </div>
-<div class="inputline" id="heading-line">
+<div class="inputline" id="heading-line2">
    <label class="line"><?lsmb text('Heading') ?></label>
    <div class="inputgroup">
       <?lsmb
@@ -530,5 +526,5 @@ INCLUDE 'ui-header.html'
 </div>
 </div>
 <?lsmb END ?>
+</div>
 </body>
-</html>

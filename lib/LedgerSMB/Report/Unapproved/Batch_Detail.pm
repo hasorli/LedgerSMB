@@ -1,3 +1,6 @@
+
+package LedgerSMB::Report::Unapproved::Batch_Detail;
+
 =head1 NAME
 
 LedgerSMB::Report::Unapproved::Batch_Detail - List Vouchers by Batch
@@ -28,8 +31,8 @@ LedgerSMB::Report::Unapproved::Batch_Overview instead.
 
 =cut
 
-package LedgerSMB::Report::Unapproved::Batch_Detail;
 use Moose;
+use namespace::autoclean;
 use LedgerSMB::DBObject::User;
 extends 'LedgerSMB::Report';
 
@@ -251,12 +254,12 @@ sub run_report{
         $script = $class_to_script->{lc($ref->{batch_class_id})};
         $ref->{reference_href_suffix} = "$script.pl?action=edit&id=$ref->{id}" if $script;
     }
-    $self->rows(\@rows);
+    return $self->rows(\@rows);
 }
 
 =back
 
-=head1 COPYRIGHT
+=head1 LICENSE AND COPYRIGHT
 
 COPYRIGHT (C) 2012 The LedgerSMB Core Team.  This file may be re-used following
 the terms of the GNU General Public License version 2 or at your option any

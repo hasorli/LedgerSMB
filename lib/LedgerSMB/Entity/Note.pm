@@ -1,3 +1,6 @@
+
+package LedgerSMB::Entity::Note;
+
 =head1 NAME
 
 LedgerSMB::Entity::Note - Notes handling for customers, vendors,
@@ -19,8 +22,9 @@ level.
 
 =cut
 
-package LedgerSMB::Entity::Note;
+use LedgerSMB::Magic qw( NC_ENTITY_CREDIT_ACCOUNT);
 use Moose;
+use namespace::autoclean;
 with 'LedgerSMB::PGObject';
 
 
@@ -53,6 +57,18 @@ If set this indicates this has been saved to the db.
 =cut
 
 has 'id' => (is =>'ro', isa => 'Int', required => 0);
+
+=item created_by
+
+If set this indicates the username (login) of the user who created
+the note.
+
+=cut
+
+has 'created_by' => (is => 'ro', isa => 'Maybe[Str]', required => 0);
+
+###BUG 2822 (TODO)
+### we need to add the 'created' field, which maps the psql 'timestamp' value
 
 =item subject
 
@@ -117,7 +133,7 @@ setting things like the id field.
 sub save {
     my ($self) = @_;
     my $ref;
-    if (3 == $self->note_class){
+    if ( NC_ENTITY_CREDIT_ACCOUNT == $self->note_class){
         ($ref) = $self->call_dbmethod(funcname => 'eca__save_notes');
     } else {
         ($ref) = $self->call_dbmethod(funcname => 'entity__save_notes');
@@ -127,7 +143,7 @@ sub save {
 
 =back
 
-=head1 COPYRIGHT
+=head1 LICENSE AND COPYRIGHT
 
 OPYRIGHT (C) 2012 The LedgerSMB Core Team.  This file may be re-used under the
 terms of the GNU General Public License version 2 or at your option any later

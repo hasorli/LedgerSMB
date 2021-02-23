@@ -1,10 +1,11 @@
-=pod
+
+package LedgerSMB::Scripts::drafts;
 
 =head1 NAME
 
 LedgerSMB:Scripts::drafts - web entry points for managing to-be posted docs
 
-=head1 SYNOPSIS
+=head1 DESCRIPTION
 
 This module contains the workflows for managing unapproved, unbatched financial
 transactions.  This does not contain facities for creating such transactions,
@@ -16,9 +17,6 @@ which have not been approved yet.
 =over
 
 =cut
-
-
-package LedgerSMB::Scripts::drafts;
 
 use LedgerSMB::DBObject::Draft;
 use LedgerSMB::Template;
@@ -142,14 +140,14 @@ sub list_drafts {
     my $report = LedgerSMB::Report::Unapproved::Drafts->new(%$request);
     $request->open_form;
     $report->run_report;
-    return $report->render_to_psgi($request);
+    return $report->render($request);
 }
 
 
 
 =back
 
-=head1 COPYRIGHT
+=head1 LICENSE AND COPYRIGHT
 
 Copyright (C) 2009 LedgerSMB Core Team.  This file is licensed under the GNU
 General Public License version 2, or at your option any later version.  Please

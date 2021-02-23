@@ -1,3 +1,6 @@
+
+package LedgerSMB::Report::Timecards;
+
 =head1 NAME
 
 LedgerSMB::Report::Timecards - Time and materials reports for LedgerSMB
@@ -15,9 +18,9 @@ and sales order generation among other things.
 
 =cut
 
-package LedgerSMB::Report::Timecards;
 use LedgerSMB::MooseTypes;
 use Moose;
+use namespace::autoclean;
 extends 'LedgerSMB::Report';
 with 'LedgerSMB::Report::Dates';
 
@@ -187,14 +190,14 @@ sub run_report {
     my @rows = $self->call_dbmethod(funcname => 'timecard__report');
     for my $row (@rows){
         $row->{"day$row->{weekday}"} = $row->{qty};
-        $row->{"row_id"} = $row->{id};
+        $row->{'row_id'} = $row->{id};
     }
-    $self->rows(\@rows);
+    return $self->rows(\@rows);
 }
 
 =back
 
-=head1 COPYRIGHT
+=head1 LICENSE AND COPYRIGHT
 
 =cut
 

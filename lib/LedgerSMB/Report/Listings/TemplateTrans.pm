@@ -1,11 +1,24 @@
+
+package LedgerSMB::Report::Listings::TemplateTrans;
+
 =head1 NAME
 
 LedgerSMB::Report::Listings::TemplateTrans - Listing of Template Transactions
 
+=head1 DESCRIPTION
+
+Implements a listing of template transactions: transactions which have
+been (mostly) pre-filled. These transactions have themselves not been
+posted, however, copies of these transactions can be (quickly) posted
+due to the fact that only minimal additional data needs te be specified
+in order to complete the financial transaction.
+
 =cut
 
-package LedgerSMB::Report::Listings::TemplateTrans;
 use Moose;
+use namespace::autoclean;
+use LedgerSMB::Magic qw( JRNL_GJ JRNL_AR JRNL_AP );
+
 extends 'LedgerSMB::Report';
 
 =head1 SYNOPSIS
@@ -42,7 +55,7 @@ has approved => (is => 'ro', isa => 'Bool', default => 0);
 
 sub columns {
     my ($self) = @_;
-    my $href_base="transtemplate.pl?action=view&id=";
+    my $href_base='transtemplate.pl?action=view&id=';
     return [ {
         col_id => 'row_select',
         type => 'checkbox',
@@ -75,7 +88,7 @@ none
 
 =cut
 
-sub header_lines { [] }
+sub header_lines { return [] }
 
 =head2 set_buttons
 
@@ -110,9 +123,9 @@ sub name {
 =cut
 
 my %jtype = (
-    1 => 'gl',
-    2 => 'ar',
-    3 => 'ap',
+    JRNL_GJ() => 'gl',
+    JRNL_AR() => 'ar',
+    JRNL_AP() => 'ap'
     );
 
 sub run_report {
@@ -123,10 +136,10 @@ sub run_report {
        $ref->{journal_type} = $jtype{$ref->{entry_type}};
        $ref->{row_id} = $ref->{id};
     }
-    $self->rows(\@rows);
+    return $self->rows(\@rows);
 }
 
-=head1 COPYRIGHT
+=head1 LICENSE AND COPYRIGHT
 
 Copyright (C) 2016 The LedgerSMB Core Team
 

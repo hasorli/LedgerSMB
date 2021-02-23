@@ -1,8 +1,9 @@
 
 require(["dojo/parser", "dojo/query", "dojo/on", "dijit/registry",
          "dojo/_base/event", "dojo/hash", "dojo/topic", "dojo/dom-class",
-         "dojo/domReady!"],
-        function(parser, query, on, registry, event, hash, topic, domClass) {
+         "dojo/ready", "dojo/domReady!"],
+        function(parser, query, on, registry, event, hash, topic, domClass,
+                 ready) {
             parser.parse().then(function() {
                 // delay the option of triggering load_link() until
                 // the parser has run: before then, the maindiv widget
@@ -28,6 +29,7 @@ require(["dojo/parser", "dojo/query", "dojo/on", "dijit/registry",
                           event.stop(e);
                           c++;
                           hash(href + c.toString(16));
+                          mainDiv.fade_main_div();
                         }
                     });
                     var l = window.location;
@@ -45,34 +47,16 @@ require(["dojo/parser", "dojo/query", "dojo/on", "dijit/registry",
                 }
 
                 query("a.menu-terminus").forEach(interceptClick);
-                query("#console-container")
-                    .forEach(function(node) {
-                        domClass.add(node, "done-parsing");
-                    });
-                query("body")
-                    .forEach(function(node) {
-                        domClass.add(node, "done-parsing");
-                    });
-            });
-        });
 
-
-require([
-    "dojo/on", "dojo/query", "dojo/dom-class", "dojo/_base/event",
-    "dojo/domReady!"],
-        function (on, query, domclass, event) {
-            query("a.t-submenu").forEach(function(node){
-                on(node, "click", function(e) {
-                  if ( !e.ctrlKey && !e.shiftKey && !e.button != 0 ) {
-                    event.stop(e);
-                    var parent = node.parentNode;
-                    if (domclass.contains(parent, "menu_closed")) {
-                        domclass.replace(parent, "menu_open", "menu_closed");
-                    }
-                    else {
-                        domclass.replace(parent, "menu_closed", "menu_open");
-                    }
-                  }
+                ready(999, function() {
+                    query("#console-container")
+                        .forEach(function(node) {
+                            domClass.add(node, "done-parsing");
+                        });
+                    query("body")
+                        .forEach(function(node) {
+                            domClass.add(node, "done-parsing");
+                        });
                 });
             });
         });

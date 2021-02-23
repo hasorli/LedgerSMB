@@ -1,3 +1,6 @@
+
+package LedgerSMB::Report::Listings::Business_Unit;
+
 =head1 NAME
 
 LedgerSMB::Report::Listings::Business_Unit - List Business Reporting Units
@@ -8,8 +11,8 @@ LedgerSMB::Report::Listings::Business_Unit - List Business Reporting Units
 
 =cut
 
-package LedgerSMB::Report::Listings::Business_Unit;
 use Moose;
+use namespace::autoclean;
 extends 'LedgerSMB::Report';
 
 =head1 DESCRIPTION
@@ -74,7 +77,7 @@ None.
 
 =cut
 
-sub header_lines { [] };
+sub header_lines { return [] };
 
 =head2 name
 
@@ -82,7 +85,7 @@ Business Units List
 
 =cut
 
-sub name { LedgerSMB::Report::text('Business Unit List'); }
+sub name { return LedgerSMB::Report::text('Business Unit List'); }
 
 =head1 METHODS
 
@@ -92,14 +95,14 @@ sub name { LedgerSMB::Report::text('Business Unit List'); }
 
 sub run_report {
     my $self = shift;
-    $self->rows([
-      map { { %$_, row_id => $_->{id}, } }
+    return $self->rows([
+      map { +{ %$_, row_id => $_->{id}, } }
        $self->call_dbmethod(funcname => 'business_unit__list_by_class',
                               args => { business_unit_class_id => $self->id } )
     ]);
 }
 
-=head1 COPYRIGHT
+=head1 LICENSE AND COPYRIGHT
 
 Copyright (C) 2014 The LedgerSMB Core Team.  This file may be re-used under the
 terms of the GNU General Public License version 2 or at your option any later

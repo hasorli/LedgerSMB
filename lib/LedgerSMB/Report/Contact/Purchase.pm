@@ -1,3 +1,6 @@
+
+package LedgerSMB::Report::Contact::Purchase;
+
 =head1 NAME
 
 LedgerSMB::Report::Contact::Purchase - Search AR/AP Transactions and
@@ -26,8 +29,8 @@ certain point, and locating specific transactions.
 
 =cut
 
-package LedgerSMB::Report::Contact::Purchase;
 use Moose;
+use namespace::autoclean;
 extends 'LedgerSMB::Report';
 with 'LedgerSMB::Report::Dates';
 
@@ -298,12 +301,12 @@ sub run_report {
             $r->{invnumber_href_suffix} = "$href?action=edit&id=$r->{id}";
        }
     }
-    $self->rows(\@rows);
+    return $self->rows(\@rows);
 }
 
 =back
 
-=head1 COPYRIGHT
+=head1 LICENSE AND COPYRIGHT
 
 COPYRIGHT (C) 2012 The LedgerSMB Core Team.  This file may be re-used following
 the terms of the GNU General Public License version 2 or at your option any

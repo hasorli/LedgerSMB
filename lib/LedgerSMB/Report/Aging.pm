@@ -1,3 +1,6 @@
+
+package LedgerSMB::Report::Aging;
+
 =head1 NAME
 
 LedgerSMB::Report::Aging - AR/AP Aging reports for LedgerSMB
@@ -18,8 +21,8 @@ reportins aimed at the customer in question.
 
 =cut
 
-package LedgerSMB::Report::Aging;
 use Moose;
+use namespace::autoclean;
 extends 'LedgerSMB::Report';
 
 use LedgerSMB::Business_Unit_Class;
@@ -184,7 +187,7 @@ Returns the name of the template to use
 
 sub template {
     my ($self) = @_;
-    if (!$self->format or (uc($self->format) eq 'HTML')
+    if (not $self->format or (uc($self->format) eq 'HTML')
            or (uc($self->format) eq 'PDF'))
     {
            return 'Reports/aging_report';
@@ -289,12 +292,12 @@ sub run_report{
         $row->{total} = $row->{c0} + $row->{c30} + $row->{c60} + $row->{c90};
         $self->total($self->total + $row->{total});
     }
-    $self->rows(\@rows);
+    return $self->rows(\@rows);
 }
 
 =back
 
-=head1 COPYRIGHT
+=head1 LICENSE AND COPYRIGHT
 
 COPYRIGHT (C) 2012 The LedgerSMB Core Team.  This file may be re-used following
 the terms of the GNU General Public License version 2 or at your option any

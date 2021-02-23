@@ -45,6 +45,8 @@ use LedgerSMB::Setting;
 use LedgerSMB::App_State;
 use LedgerSMB::PGNumber;
 
+use LedgerSMB::Magic qw(BC_VENDOR_INVOICE);
+
 =over
 
 =item get_files
@@ -109,14 +111,18 @@ sub post_invoice {
     my $item;
     my $invoice_id;
     my $keepcleared;
+    my $fxdiff = 0;
 
-    ( $null, $form->{employee_id} ) = split /--/, $form->{employee};
+    ( $null, $form->{employee_id} ) = split /--/, $form->{employee}
+        if $form->{employee};
 
     unless ( $form->{employee_id} ) {
-        ( $form->{employee}, $form->{employee_id} ) = $form->get_employee($dbh);
+        ( $form->{employee}, $form->{employee_id} ) = $form->get_employee;
     }
 
-    ( $null, $form->{department_id} ) = split( /--/, $form->{department} );
+    $form->{department_id} = 0;
+    ( $null, $form->{department_id} ) = split( /--/, $form->{department} )
+        if $form->{department};
     $form->{department_id} *= 1;
 
     $query = qq|
@@ -211,7 +217,6 @@ sub post_invoice {
             push( @{ $form->{serialnumber} },  $form->{"serialnumber_$i"} );
 
             push( @{ $form->{bin} },         $form->{"bin_$i"} );
-            warn $form->{"description_$i"};
             push( @{ $form->{item_description} }, $form->{"description_$i"} );
             push( @{ $form->{itemnotes} },   $form->{"notes_$i"} );
             push(
@@ -230,7 +235,7 @@ sub post_invoice {
             push( @{ $form->{projectnumber} }, $form->{"projectnumber_$i"} );
 
             push( @{ $form->{sellprice} }, $form->{"sellprice_$i"} );
-
+            $form->{discount} = [] if ref $form->{discount} ne 'ARRAY';
             push( @{ $form->{discount} }, $form->{"discount_$i"} );
 
             push( @{ $form->{listprice} }, $form->{"listprice_$i"} );
@@ -244,7 +249,7 @@ sub post_invoice {
                 )
             );
 
-            if ( $form->{"projectnumber_$i"} ne "" ) {
+            if ( $form->{"projectnumber_$i"} && $form->{"projectnumber_$i"} ne "" ) {
                 ( $null, $project_id ) =
                   split /--/, $form->{"projectnumber_$i"};
             }
@@ -260,7 +265,7 @@ sub post_invoice {
             my ($dec) = ( $fxsellprice =~ /\.(\d+)/ );
             # deduct discount
             my $moneyplaces = LedgerSMB::Setting->get('decimal_places');
-            $decimalplaces = ($form->{"precision_$i"} > $moneyplaces)
+            $decimalplaces = ($form->{"precision_$i"} && $form->{"precision_$i"} > $moneyplaces)
                              ? $form->{"precision_$i"}
                              : $moneyplaces;
             $form->{"sellprice_$i"} = $fxsellprice -
@@ -382,7 +387,7 @@ sub post_invoice {
                      || $form->dberror($query);
                 if (!$form->{approved}){
                    if (not defined $form->{batch_id}){
-                       $form->error($locale->text('Batch ID Missing'));
+                       $form->error('Batch ID Missing');
                    }
                    $query = qq|
             INSERT INTO voucher (batch_id, trans_id) VALUES (?, ?)|;
@@ -460,7 +465,7 @@ sub post_invoice {
     }
 
     $form->{paid} = 0;
-    for $i ( 1 .. $form->{paidaccounts} ) {
+    foreach my $i ( 1 .. ( $form->{paidaccounts} || 0 )) {
         $form->{"paid_$i"} =
           $form->parse_amount( $myconfig, $form->{"paid_$i"} );
         $form->{"paid_$i"} *= -1 if $form->{reverse};
@@ -481,12 +486,14 @@ sub post_invoice {
     $invnetamount = $amount;
 
     $amount = 0;
-    for ( split / /, $form->{taxaccounts} ) {
-        $amount += $form->{acc_trans}{ $form->{id} }{$_}{amount} =
-          $form->round_amount( $form->{acc_trans}{ $form->{id} }{$_}{amount},
-            2 );
+    if ($form->{taxaccounts}) {
+        for ( split / /, $form->{taxaccounts} ) {
+            $amount += $form->{acc_trans}{ $form->{id} }{$_}{amount} =
+              $form->round_amount( $form->{acc_trans}{ $form->{id} }{$_}{amount},
+                2 );
 
-        $form->{acc_trans}{ $form->{id} }{$_}{amount} *= -1;
+            $form->{acc_trans}{ $form->{id} }{$_}{amount} *= -1;
+        }
     }
     $invamount = $invnetamount + $amount;
 
@@ -507,7 +514,7 @@ sub post_invoice {
           $form->round_amount( $form->{paid} * $form->{exchangerate}, 2 );
     }
 
-    foreach $ref ( sort { $b->{amount} <=> $a->{amount} }
+    foreach my $ref ( sort { $b->{amount} <=> $a->{amount} }
         @{ $form->{acc_trans}{lineitems} } )
     {
 
@@ -555,7 +562,7 @@ sub post_invoice {
               "INSERT INTO tax_extended (entry_id, tax_basis, rate)
                     VALUES (currval('acc_trans_entry_id_seq'), ?, ?)"
         );
-        for $taccno (split / /, $form->{taxaccounts}){
+        foreach my $taccno (split / /, $form->{taxaccounts}){
             my $taxamount;
             my $taxbasis;
             my $taxrate;
@@ -578,7 +585,6 @@ sub post_invoice {
         $tax_sth->finish;
     }
 
-
     # record payable
     if ( $form->{payables} ) {
         ($accno) = split /--/, $form->{AP};
@@ -589,6 +595,9 @@ sub post_invoice {
                          VALUES (?, (SELECT id FROM account WHERE accno = ?),
                                 ?, ?, ?)|;
         $sth = $dbh->prepare($query);
+        #The following generates a rounding error in PgNumber in tests
+        #because Math::BigFloat doesn't handle subclassing andcorrectly and
+        #and uses LedgerSMB::PGNumber to access its own internal data
         $sth->execute( $form->{id}, $accno,
                     $form->{payables}/$form->{exchangerate},
             $form->{transdate} , 0)
@@ -629,7 +638,7 @@ sub post_invoice {
     my $cleared = 0;
 
     # record payments and offsetting AP
-    for my $i ( 1 .. $form->{paidaccounts} ) {
+    for my $i ( 1 .. ( $form->{paidaccounts} || 0 )) {
 
         if ( $form->{"paid_$i"} ) {
             my ($accno) = split /--/, $form->{"AP_paid_$i"};
@@ -760,6 +769,7 @@ sub post_invoice {
     }
 
     # set values which could be empty
+    $form->{taxincluded} //= 0;
     $form->{taxincluded} *= 1;
 
     my $approved = 1;
@@ -807,19 +817,20 @@ sub post_invoice {
         $sth = $dbh->prepare(
            'INSERT INTO voucher (batch_id, trans_id, batch_class)
             VALUES (?, ?, ?)');
-        $sth->execute($form->{batch_id}, $form->{id}, 9);
+        $sth->execute($form->{batch_id}, $form->{id}, BC_VENDOR_INVOICE);
     }
 
     # add shipto
     $form->{name} = $form->{vendor};
-    $form->{name} =~ s/--$form->{vendor_id}//;
-    $form->add_shipto( $dbh, $form->{id} );
+    $form->{name} =~ s/--$form->{vendor_id}//
+        if $form->{vendor} && $form->{vendor_id};
+    $form->add_shipto($form->{id});
 
     if (!$form->{separate_duties}){
         $self->add_cogs($form);
     }
 
-    foreach $item ( keys %updparts ) {
+    foreach my $item ( keys %updparts ) {
         $item  = $dbh->quote($item);
         $query = qq|
             UPDATE parts
@@ -829,7 +840,7 @@ sub post_invoice {
         $dbh->do($query) || $form->dberror($query);
     }
 
-
+    return 1;
 }
 
 sub retrieve_invoice {
@@ -1080,7 +1091,7 @@ sub retrieve_item {
 
     if ( $form->{"partnumber_$i"} ne "" ) {
         $var = $dbh->quote( $form->{"partnumber_$i"} );
-        $where .= " AND lower(p.partnumber) = $var or mm.barcode is not null";
+        $where .= " AND p.partnumber = $var or mm.barcode is not null";
     }
 
     if ( $form->{"partsgroup_$i"} ne "" ) {
@@ -1200,7 +1211,7 @@ sub exchangerate_defaults {
     my $eth2 = $dbh->prepare($query) || $form->dberror($query);
 
     # get exchange rates for transdate or max
-    foreach $var ( split /:/, substr( $form->{currencies}, 4 ) ) {
+    foreach my $var ( split /:/, substr( $form->{currencies}, 4 ) ) {  ## no critic (ProhibitMagicNumbers) sniff
         $eth1->execute( $var, $form->{transdate} );
         @array = $eth1->fetchrow_array;
     $form->db_parse_numeric(sth=> $eth1, arrayref=>\@array);

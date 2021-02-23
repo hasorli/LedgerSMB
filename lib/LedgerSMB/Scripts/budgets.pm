@@ -1,16 +1,18 @@
+
+package LedgerSMB::Scripts::budgets;
+
 =head1 NAME
 
 LedgerSMB::Scripts::budgets - web entry points for administration of budgets
 
-=cut
+=head1 DESCRIPTION
 
-package LedgerSMB::Scripts::budgets;
+Budget workflow scripts.
+
+=cut
 
 use strict;
 use warnings;
-
-=head1 SYNOPSYS
-Budget workflow scripts.
 
 =head1 REQUIRES
 
@@ -25,6 +27,8 @@ Budget workflow scripts.
 use LedgerSMB::Budget;
 use LedgerSMB::Business_Unit;
 use LedgerSMB::Business_Unit_Class;
+use LedgerSMB::Magic qw( EDIT_BUDGET_ROWS NEW_BUDGET_ROWS );
+
 
 =head1 METHODS
 
@@ -50,8 +54,8 @@ sub new_budget {
 
 sub _render_screen {
     my ($budget) = @_;
-    my $additional_rows = 5;
-    $additional_rows +=20 unless $budget->lines;
+    my $additional_rows = EDIT_BUDGET_ROWS;
+    $additional_rows = NEW_BUDGET_ROWS unless $budget->lines;
     $additional_rows = 0 if $budget->id;
     my $buc = LedgerSMB::Business_Unit_Class->new(
            control_code => '', class_id => 0
@@ -141,7 +145,7 @@ sub _render_screen {
            rowcount => $budget->{rowcount},
                  id => $budget->{id},
     };
-    return $template->render_to_psgi($budget);
+    return $template->render($budget);
 }
 
 =item update
@@ -277,12 +281,15 @@ sub begin_search{
 
 =back
 
-=head1 COPYRIGHT AND LICENSE
+=head1 LICENSE AND COPYRIGHT
 
-Copyright (C) 2011 LedgerSMB Core Team.  This file is licensed under the GNU
-General Public License version 2, or at your option any later version.  Please
-see the included License.txt for details.
+Copyright (C) 2012-2018 The LedgerSMB Core Team
+
+This file is licensed under the Gnu General Public License version 2, or at your
+option any later version.  A copy of the license should have been included with
+your software.
 
 =cut
+
 
 1;

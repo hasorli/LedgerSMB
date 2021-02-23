@@ -1,3 +1,6 @@
+
+package LedgerSMB::Report::PNL::Income_Statement;
+
 =head1 NAME
 
 LedgerSMB::Report::PNL::Income_Statement - Basic Income Statement for LedgerSMB
@@ -13,8 +16,8 @@ This provides the income statement report for LedgerSMB on 1.4 and later.
 
 =cut
 
-package LedgerSMB::Report::PNL::Income_Statement;
 use Moose;
+use namespace::autoclean;
 extends 'LedgerSMB::Report::PNL';
 
 =head1 CRITERIA PROPERTIES
@@ -30,23 +33,6 @@ This is either 'cash' or 'accrual'
 =cut
 
 has basis => (is => 'ro', isa =>'Str', required => 1);
-
-=item comparison_periods
-
-This is the number of periods to compare to
-
-=cut
-
-has comparison_periods => (is => 'ro', isa =>'Int',
-                required =>0, default => 1);
-
-=item comparison_type
-
-This is either by number of periods or by dates
-
-=cut
-
-has comparison_type => (is => 'ro', isa =>'Str', required => 1, default => "by_periods");
 
 =item ignore_yearend
 
@@ -125,7 +111,7 @@ sub report_base {
 
 =back
 
-=head1 COPYRIGHT
+=head1 LICENSE AND COPYRIGHT
 
 COPYRIGHT (C) 2012 The LedgerSMB Core Team.  This file may be re-used under the
 terms of the LedgerSMB General Public License version 2 or at your option any
@@ -133,4 +119,5 @@ later version.  Please see enclosed LICENSE file for details.
 
 =cut
 
+__PACKAGE__->meta->make_immutable;
 1;

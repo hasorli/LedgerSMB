@@ -1,10 +1,11 @@
-=pod
+
+package LedgerSMB::Scripts::recon;
 
 =head1 NAME
 
 LedgerSMB::Scripts::recon - web entry points for reconciliation workflow
 
-=head1 SYOPSIS
+=head1 DESCRIPTION
 
 This module acts as the UI controller class for Reconciliation. It controls
 interfacing with the Core Logic and database layers.
@@ -16,10 +17,9 @@ interfacing with the Core Logic and database layers.
 # NOTE:  This is a first draft modification to use the current parameter type.
 # It will certainly need some fine tuning on my part.  Chris
 
-package LedgerSMB::Scripts::recon;
-
 use LedgerSMB::Template;
 use LedgerSMB::DBObject::Reconciliation;
+use HTTP::Status qw( HTTP_BAD_REQUEST);
 use LedgerSMB::Setting;
 use LedgerSMB::Scripts::reports;
 use LedgerSMB::Report::Reconciliation::Summary;
@@ -123,8 +123,8 @@ sub submit_recon_set {
                 template => 'reconciliation/submitted',
                 locale => $request->{_locale},
                 format => 'HTML',
-                path=>"UI");
-        return $template->render_to_psgi($recon);
+                path=>'UI');
+        return $template->render($recon);
     }
     return _display_report($recon, $request);
 }
@@ -156,7 +156,7 @@ Displays the search results
 sub get_results {
     my ($request) = @_;
     my $report = LedgerSMB::Report::Reconciliation::Summary->new(%$request);
-    return $report->render_to_psgi($request);
+    return $report->render($request);
 }
 
 =item search
@@ -201,7 +201,20 @@ sub _display_report {
     $request->close_form;
     $request->open_form;
     $recon->unapproved_checks;
-    $recon->add_entries($recon->import_file('csv_file')) if !$recon->{submitted};
+
+    my $contents = '';
+    {
+        my $handle = eval { $request->upload('csv_file') };
+
+        local $/ = undef;
+        $contents = <$handle> if defined $handle;
+    }
+
+    # An empty string is recognized by the entry-importer (ISO20022)
+    # as a file name (due to absense of '<' and '>'); only call it
+    # when there's actual content to handle.
+    $recon->add_entries($recon->import_file($contents))
+        if $contents && !$recon->{submitted};
     $recon->{can_approve} = $request->is_allowed_role({allowed_roles => ['reconciliation_approve']});
     $recon->get();
     $recon->{form_id} = $request->{form_id};
@@ -210,7 +223,7 @@ sub _display_report {
         template => 'reconciliation/report',
         locale => $recon->{_locale},
         format=>'HTML',
-        path=>"UI"
+        path=>'UI'
     );
     $recon->{sort_options} = [
             {id => 'clear_time', label => $recon->{_locale}->text('Clear date')},
@@ -258,24 +271,27 @@ sub _display_report {
         for my $amt_name (qw/ our_ their_ /) {
             for my $bal_type (qw/ balance credits debits/) {
                 $l->{"$amt_name$bal_type"} = $l->{"$amt_name$bal_type"}->to_output(money=>1);
-                }
+            }
         }
     }
 
     $recon->{zero_string} = LedgerSMB::PGNumber->from_input(0)->to_output(money => 1);
 
-    $recon->{statement_gl_calc} = $neg_factor *
+  $recon->{statement_gl_calc} = $neg_factor *
                                     ($recon->{their_total}
                                     + $recon->{outstanding_total}
                                     + $recon->{mismatch_our_total});
     $recon->{out_of_balance} = $recon->{their_total} - $recon->{our_total};
-    $recon->{submit_enabled} = ($recon->{their_total} == $recon->{our_total});
+    $recon->{out_of_balance}->bfround(
+        LedgerSMB::Setting->get('decimal_places') * -1
+    );
+    $recon->{submit_enabled} = ($recon->{out_of_balance} == 0);
 
     # Check if only one entry could explain the difference
     if ( !$recon->{submit_enabled}) {
         for my $l (@{$recon->{report_lines}}){
-            $l->{suspect} = $l->{their_credits} == abs($recon->{out_of_balance})
-                         || $l->{their_debits}  == abs($recon->{out_of_balance})
+            $l->{suspect} = $l->{our_credits} == -$recon->{out_of_balance}
+                         || $l->{our_debits}  ==  $recon->{out_of_balance}
                          ? 1 : 0;
         }
     }
@@ -293,7 +309,7 @@ sub _display_report {
         $recon->{"$field"} ||= LedgerSMB::PGNumber->from_db(0);
         $recon->{"$field"} = $recon->{"$field"}->to_output(money => 1);
     }
-    return $template->render_to_psgi($recon);
+    return $template->render($recon);
 }
 
 
@@ -302,7 +318,30 @@ sub _display_report {
 Displays the new report screen.
 
 =cut
+
 sub new_report {
+    my ($request) = @_;
+
+    my $recon = LedgerSMB::DBObject::Reconciliation->new({
+        base => $request, copy => 'all' });
+
+    # we can assume we're to generate the "Make a happy new report!" page.
+    @{$recon->{accounts}} = $recon->get_accounts;
+    my $template = LedgerSMB::Template->new(
+        user => $recon->{_user},
+        template => 'reconciliation/upload',
+        locale => $recon->{_locale},
+        format => 'HTML',
+        path => 'UI',
+    );
+    return $template->render($recon);
+}
+
+=item start_report($request)
+
+=cut
+
+sub start_report {
     my ($request) = @_;
 
     # Trap user error: dates accidentally entered in the amount field
@@ -313,49 +352,23 @@ sub new_report {
     }
 
     $request->{total} = LedgerSMB::PGNumber->from_input($request->{total});
-    my $template;
-    my $return;
-    my $recon = LedgerSMB::DBObject::Reconciliation->new({base => $request, copy => 'all'});
-    # This method detection makes debugging a bit harder.
-    # Not sure I like it but won't refactor until 1.4..... --CT
-    #
-    if ($request->type() eq "POST") {
+    my $recon = LedgerSMB::DBObject::Reconciliation->new({
+        base => $request, copy => 'all' });
 
-        # We can assume that we're doing something useful with new data.
-        # We can also assume that we've got a file.
 
-        # $self is expected to have both the file handling logic, as well as
-        # the logic to load the processing module.
-
-        # Why isn't this testing for errors?
-        my ($report_id, $entries) = $recon->new_report($recon->import_file());
-        if ($recon->{error}) {
-            #$recon->{error};
-
-            $template = LedgerSMB::Template->new(
-                user=>$recon->{_user},
-                template=> 'reconciliation/upload',
-                locale => $recon->{_locale},
-                format=>'HTML',
-                path=>"UI"
-            );
-            return $template->render_to_psgi($recon);
-        }
-        return _display_report($recon, $request);
-    }
-    else {
-
-        # we can assume we're to generate the "Make a happy new report!" page.
-        @{$recon->{accounts}} = $recon->get_accounts;
-        $template = LedgerSMB::Template->new(
+    # Why isn't this testing for errors?
+    my ($report_id, $entries) = $recon->new_report($recon->import_file());
+    if ($recon->{error}) {
+        my $template = LedgerSMB::Template->new(
             user => $recon->{_user},
             template => 'reconciliation/upload',
             locale => $recon->{_locale},
             format => 'HTML',
-            path=>"UI"
-        );
-        return $template->render_to_psgi($recon);
+            path => 'UI'
+            );
+        return $template->render($recon);
     }
+    return _display_report($recon, $request);
 }
 
 =item delete_report($request)
@@ -401,31 +414,24 @@ sub approve {
         return get_results($request);
     }
 
-    # Approve will also display the report in a blurred/opaqued out version,
-    # with the controls removed/disabled, so that we know that it has in fact
-    # been cleared. This will also provide for return-home links, auditing,
-    # etc.
+    return [ HTTP_BAD_REQUEST,
+             [ 'Content-Type' => 'text/plain; charset=utf-8' ],
+             [ q{'report_id' parameter missing} ]
+        ] if ! $request->{report_id};
 
-    if ($request->type() eq "POST") {
+    my $recon = LedgerSMB::DBObject::Reconciliation->new(
+        { base => $request, copy=> 'all' });
 
-        # we need a report_id for this.
-
-        my $recon = LedgerSMB::DBObject::Reconciliation->new({base => $request, copy=> 'all'});
-
-        my $code = $recon->approve($request->{report_id});
-        my $template = $code == 0 ? 'reconciliation/approved'
-                                  : 'reconciliation/report';
-        return LedgerSMB::Template->new(
-                user => $recon->{_user},
-                        template => $template,
-                locale => $recon->{_locale},
-                format => 'HTML',
-                path=>"UI"
-                        )->render_to_psgi($recon);
-    }
-    else {
-        return _display_report($request, $request);
-    }
+    my $code = $recon->approve($request->{report_id});
+    my $template = $code == 0 ? 'reconciliation/approved'
+        : 'reconciliation/report';
+    return LedgerSMB::Template->new(
+        user => $recon->{_user},
+        template => $template,
+        locale => $recon->{_locale},
+        format => 'HTML',
+        path=>'UI',
+        )->render($recon);
 }
 
 =item pending ($self, $request, $user)
@@ -449,30 +455,35 @@ sub pending {
         template=>'reconciliation/pending',
         locale => $request->{_locale},
         format=>'HTML',
-        path=>"UI"
+        path=>'UI'
     );
-    if ($request->type() eq "POST") {
-        return $template->render_to_psgi(
-            {
-                pending=>$recon->get_pending($request->{year}."-".$request->{month})
-            }
-        );
-    }
-    else {
-        return $template->render_to_psgi();
-    }
+    return $template->render();
 }
 
-###TODO-LOCALIZE-DOLLAR-AT
-eval { do "scripts/custom/recon.pl" };
-1;
+{
+    local ($!, $@) = (undef, undef);
+    my $do_ = 'scripts/custom/recon.pl';
+    if ( -e $do_ ) {
+        unless ( do $do_ ) {
+            if ($! or $@) {
+                warn "\nFailed to execute $do_ ($!): $@\n";
+                die (  "Status: 500 Internal server error (recon.pm)\n\n" );
+            }
+        }
+    }
+};
 
 =back
 
-=head1 Copyright (C) 2007, The LedgerSMB core team.
+=head1 LICENSE AND COPYRIGHT
+
+Copyright (C) 2011-2018 The LedgerSMB Core Team
 
 This file is licensed under the Gnu General Public License version 2, or at your
 option any later version.  A copy of the license should have been included with
 your software.
 
 =cut
+
+
+1;

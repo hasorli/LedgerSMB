@@ -752,7 +752,8 @@ SELECT lsmb__grant_perms('part_delete', obj, 'DELETE')
 
 SELECT lsmb__create_role('inventory_reports');
 SELECT lsmb__grant_perms('inventory_reports', obj, 'SELECT')
-  FROM unnest(array['ar'::text, 'ap', 'warehouse_inventory', 'invoice', 'acc_trans']) obj;
+  FROM unnest(array['ar'::text, 'ap', 'warehouse_inventory',
+                    'invoice', 'acc_trans']) obj;
 
 SELECT lsmb__grant_menu('inventory_reports', 114, 'allow');
 SELECT lsmb__grant_menu('inventory_reports', 75, 'allow');
@@ -763,6 +764,9 @@ SELECT lsmb__grant_perms('inventory_adjust', obj, 'SELECT')
 
 SELECT lsmb__grant_perms('inventory_adjust', obj, 'INSERT')
   FROM unnest(array['inventory_report'::text, 'inventory_report_line']) obj;
+
+SELECT lsmb__grant_perms('inventory_adjust', obj, 'ALL')
+  FROM unnest(array['inventory_report_id_seq'::text]) obj;
 
 SELECT lsmb__grant_menu('inventory_adjust', node_id, 'allow')
   FROM unnest(array[6,16]) node_id;
@@ -1062,7 +1066,7 @@ SELECT lsmb__create_role('template_edit');
 SELECT lsmb__grant_perms('template_edit', 'template', 'ALL');
 SELECT lsmb__grant_perms('template_edit', 'template_id_seq', 'ALL');
 SELECT lsmb__grant_menu('template_edit', id, 'allow')
-  FROM unnest(array[29,30,31,32,33,90, 99, 159,160,161,162,163,164,165,
+  FROM unnest(array[29, 30, 31, 32, 33, 90, 99, 159,160,161,162,163,164,165,
                     166,167,168,169,170,171,173,174,175,176,177,178,179,180,
                     181,182,183,184,185,186,187,241,242]) id;
 

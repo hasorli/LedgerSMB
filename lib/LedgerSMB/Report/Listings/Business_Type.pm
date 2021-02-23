@@ -1,3 +1,6 @@
+
+package LedgerSMB::Report::Listings::Business_Type;
+
 =head1 NAME
 
 LedgerSMB::Report::Listings::Business_Type - List the Business Types in
@@ -18,8 +21,8 @@ None
 
 =cut
 
-package LedgerSMB::Report::Listings::Business_Type;
 use Moose;
+use namespace::autoclean;
 extends 'LedgerSMB::Report';
 
 =head1 STATIC METHODS
@@ -87,13 +90,13 @@ sub run_report {
     $self->manual_totals(1); #don't display totals
     my @rows = $self->call_dbmethod(funcname => 'business_type__list');
     for my $ref(@rows){
-        $ref->{id} = $ref->{id};
+        $ref->{row_id} = $ref->{id};
         $ref->{discount} *= 100;
     }
-    $self->rows(\@rows);
+    return $self->rows(\@rows);
 }
 
-=head1 COPYRIGHT
+=head1 LICENSE AND COPYRIGHT
 
 COPYRIGHT (C) 2013 The LedgerSMB Core Team.  This file may be re-used following
 the terms of the GNU General Public License version 2 or at your option any

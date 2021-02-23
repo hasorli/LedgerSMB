@@ -1,18 +1,18 @@
+
+package LedgerSMB::Scripts::contact_reports;
+
 =head1 NAME
 
 LedgerSMB::Scripts::report_aging - Aging Reports and Statements for LedgerSMB
 
-=head1 SYNOPSIS
+=head1 DESCRIPTION
 
-This module provides AR/AP aging reports and statements for LedgerSMB.
+This module provides contact reports and purchase/sales history for LedgerSMB.
 
 =head1 METHODS
 
 =cut
 
-package LedgerSMB::Scripts::contact_reports;
-
-use LedgerSMB;
 use LedgerSMB::Template;
 use LedgerSMB::Report::Contact::Search;
 use LedgerSMB::Report::Contact::History;
@@ -34,7 +34,7 @@ sub search{
 
     my $report = LedgerSMB::Report::Contact::Search->new(%$request);
     $report->run_report;
-    return $report->render_to_psgi($request);
+    return $report->render($request);
 }
 
 =item history
@@ -48,12 +48,12 @@ sub history {
 
     my $report = LedgerSMB::Report::Contact::History->new(%$request);
     $report->run_report;
-    return $report->render_to_psgi($request);
+    return $report->render($request);
 }
 
 =back
 
-=head1 COPYRIGHT
+=head1 LICENSE AND COPYRIGHT
 
 Copyright (C) 2012 The LedgerSMB Core Team.  This file may be re-used under the
 terms of te GNU General Public License version 2 or at your option any later

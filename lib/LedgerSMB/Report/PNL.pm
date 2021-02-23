@@ -1,3 +1,6 @@
+
+package LedgerSMB::Report::PNL;
+
 =head1 NAME
 
 LedgerSMB::Report::PNL - Profit and Loss Reporting Base Class for LedgerSMB
@@ -14,8 +17,8 @@ and later.
 
 =cut
 
-package LedgerSMB::Report::PNL;
 use Moose;
+use namespace::autoclean;
 extends 'LedgerSMB::Report::Hierarchical';
 with 'LedgerSMB::Report::Dates';
 
@@ -232,7 +235,7 @@ sub run_report {
     for my $id (grep { ! defined $_->{props} } values %{$self->rheads->ids}) {
         $self->rheads->id_props($id->{id}, $header_desc{$id->{accno}});
     }
-    for $col_id (keys %{$self->cheads->ids}) {
+    for my $col_id (keys %{$self->cheads->ids}) {
         for my $row_id (keys %{$self->rheads->ids}) {
             my $value = $self->cells->{$row_id}->{$col_id};
 
@@ -250,7 +253,7 @@ sub run_report {
         }
     }
 
-    $self->rows([]);
+    return $self->rows([]);
 }
 
 =back
@@ -267,7 +270,7 @@ sub run_report {
 
 =back
 
-=head1 COPYRIGHT
+=head1 LICENSE AND COPYRIGHT
 
 COPYRIGHT (C) 2012 The LedgerSMB Core Team.  This file may be re-used under the
 terms of the LedgerSMB General Public License version 2 or at your option any

@@ -2,28 +2,41 @@
 
 LedgerSMB::Template - Template support module for LedgerSMB
 
-=head1 SYNOPSIS
+=head1 DESCRIPTION
 
-This module renders templates.
+This module renders templates to an in-memory property.
+
+This module does not handle the
+output/delivery of the rendered template to browser, file,
+e-mail etc.  For that, see modules such as LedgerSMB::PSGI::Util
+and LedgerSMB::Legacy_Util.
 
 =head1 METHODS
 
 =over
 
-=item new(user => \%myconfig, template => $string, format => $string, [locale => $locale] [language => $string], [include_path => $path], [no_auto_output => $bool], [method => $string], [no_escape => $bool], [debug => $bool], [output_file => $string] );
+=item new(user => \%myconfig, template => $string, format => $string, [format_options => $hashref], [locale => $locale], [language => $string], [path => $path], [no_escape => $bool], [debug => $bool] );
 
-This command instantiates a new template:
+Instantiates a new template. Accepts the following arguments:
 
 =over
 
+=item user (optional)
+
+A LedgerSMB::User object defining user preferences.
+
 =item template
 
-The template to be processed.  This can either be a reference to the template
-in string form or the name of the file that is the template to be processed.
+The template to be processed.  This is the file that is the template to be
+processed. When 'path' equals 'DB', the file is retrieved from
+the database instead of from disk.
+Based on the specified format, an appropriate extension is appended
+to resolve to the correct template file.
 
 =item format
 
-The format to be used.  Currently HTML, PS, PDF, TXT and CSV are supported.
+The format to be used.  Currently HTML, PS, PDF, TXT, CSV, ODS, XLS, XLSX
+are supported, subject to their dependencies being available.
 
 =item format_options (optional)
 
@@ -32,8 +45,13 @@ details.
 
 =item output_options (optional)
 
-A hash of output-specific options.  See the appropriate output method for
-details.
+A hash of output-specific options, not used internally by LedgerSMB::Template.
+These options may be used by output/delivery code.
+
+For example, if the output is sent as an HTTP response using
+LedgerSMB::PSGI::Util::template_to_psgi(),  the output option C<filename>
+causes C<Content-Disposition> headers to be generated of the type
+C<attachment> (forcing file download).
 
 =item locale (optional)
 
@@ -45,17 +63,17 @@ gettext function.
 
 The language for template selection.
 
-=item include_path (optional)
+=item path (optional)
 
-Overrides the template directory.  Used with user interface templates.
+Overrides the template directory.
 
-=item no_auto_output (optional)
-
-Disables the automatic output of rendered templates.
+The special value 'DB' enforces reading of the template from the
+current database.  Resolving the template takes the 'language' and
+'format' values into account.
 
 =item no_escape (optional)
 
-Disables escaping on the template variables.
+Disables escaping on the template variables when true.
 
 =item debug (optional)
 
@@ -74,15 +92,8 @@ template to get debugging messages is to be surrounded by
   <?lsmb END ?>
     </tr>
 
-=item method/media (optional)
-
-The output method to use, defaults to HTTP.  Media is a synonym for method
-
-=item output_file (optional)
-
-The base name of the file for output.
-
 =back
+
 
 =item available_formats()
 
@@ -100,67 +111,213 @@ Returns a list of format names, any of the following (in order) as applicable:
 
 =item XLS
 
+=item XLSX
+
 =item ODS
 
 =back
 
-=item new_UI(user => \%myconfig, locale => $locale, template => $file, ...)
 
-Wrapper around the constructor that sets the path to 'UI', format to 'HTML',
-and leaves auto-output enabled.
+=item new_UI($request, template => $file, ...)
 
-=item render($hashref)
+Wrapper around the constructor that sets the following properties:
 
-This command renders the template.  If no_auto_output was not specified during
-instantiation, this also writes the result to standard output and exits.
-Otherwise it returns the name of the output file if a file was created.  When
-no output file is created, the output is held in $self->{output}.
+    path   => 'UI'
+    format => 'HTML',
+    user   => $request->{_user}
+    locale => $request->{_locale}
 
-Currently email and server-side printing are not supported.
-
-=item render_to_psgi( $variables, extra_headers => \@headers)
-
-Like C<render>, but instead of printing to STDOUT, returns
-a PSGI return value triplet (status, headers and body).
-
-Note that the only guarantee here is that the triplet can
-be used as a PSGI return value which means that the body
-is *not* restricted to being an array of strings.
-
-When C<extra_headers> is specified, these are included in
-the headers part of returned triplet.
+Additionally, variables are added to the template processor as required
+by the HTML UI.
 
 
-=item output
+=item render($variables, $raw_variables)
 
-This function outputs the rendered file in an appropriate manner.
+Returns the LedgerSMB::Template object itself. Dies on error.
 
-=item my $bool = _valid_language()
+The rendered template result is available from the LedgerSMB::Template
+object's C<output> property, based on C<variables> and C<raw_variables>.
 
-This command checks for valid langages.  Returns 1 if the language is valid,
-0 if it is not.
+C<variables> are escaped using the specific mechanism to the output
+format. C<raw_variables> are passed without escaping or processing
+to the template processor.
 
-=item column_heading()
 
-Apply locale settings to column headings and add sort urls if necessary.
+=item get_template_source($extension)
 
-=item escape($string)
+Returns the name of the Template source, incorporating the specified
+extension as appropriate.
 
-Escapes a scalar string if the format supports such escaping and returns the
-sanitized version.
 
-=item my $source = get_template_source($get_template)
-
-Returns the Template source when common or call a specialized getter if not
-
-=item my $arghash = get_template_args($extension)
+=item get_template_args($extension)
 
 Returns a hash with the default arguments for the Template and the
 desired file extention
 
 =back
 
-=head1 Copyright 2007, The LedgerSMB Core Team
+
+=head1 FUNCTIONS
+
+=over
+
+=item preprocess ($rawvars, $escape)
+
+Preprocess for rendering. This is not an object method, it is a standalone
+subroutine.
+
+=back
+
+
+=head1 PROPERTIES
+
+=over 
+
+=item output
+
+The result of rendering the template.
+
+=item mimetype
+
+The mimetype of the rendered template.
+
+=item output_options
+
+Not used internally by LedgerSMB::Template, but used as a way of passing
+options to output/delivery code, such as
+LedgerSMB::PSGI::Util::template_to_psgi().
+
+=back
+
+
+=head1 TEMPLATE FUNCTIONS
+
+Templates can make use of the following functions, installed by the
+template processor, when available for the current format.
+
+=over
+
+=item escape($string)
+
+This function encodes the string argument to be safe for inclusion in
+the target document, showing the exact content of the string.
+
+E.g. for HTML encoding, this means that ampersand is encoded into C<&amp;>
+and that newline characters in LaTeX are encoded into double backslashes.
+
+=item UNESCAPE($string) [optional]
+
+This function reverses the string-escaping as might have been applied by
+the C<escape> function. This function is not guaranteed to be available
+(currently only supported for HTML templates).
+
+=item text($string, @args)
+
+This function looks up the translation of C<$string> in the language lexicon,
+interpolating the string's variable placeholders with the arguments provided
+in C<@args>. The resulting string will be escaped using the C<escape> function.
+
+Note: This string looks up the exact string C<$string>, which makes it
+unsuited for translation of string values passed to the template through
+(escaped) string variable values.
+
+=item tt_url($string)
+
+This function applies basic URL encoding to C<$string>.
+
+=back
+
+=head1 FORMATS
+
+The template employs formats for a number of format-specific tasks:
+
+=over
+
+=item Escaping/encoding of values
+
+=item Discovery of format specific templates
+
+=item Evaluation of the template
+
+=back
+
+In order to perform these actions, formats need to implement the following
+entry-points:
+
+=over
+
+=item escape($value)
+
+The template calls this function with one scalar value as its argument,
+repeatedly until all values to be passed to the template have been escaped.
+
+The return value is the escaped value to substitute for C<$value>. The
+escaping mechanism is format specific.
+
+=item unescape($value) [optional]
+
+The template calls this function with one scalar value as its argument,
+in order to reverse the transformation as applied by C<escape>.
+
+=item setup($parent, $variables, $output)
+
+The template driver calls this function just before the evaluation of
+the template. The C<$parent> is an instance of this class. The C<$variables>
+is a hashref containing the escaped variable values which will be passed to
+the template. C<$output> holds the output destination; either
+a string (containing a filename) or a scalar reference (for in-memory
+capturing of template output).
+
+This function returns a tuple with the first value being the (temporary)
+output destination and the second a configuration hash with at least the
+following keys:
+
+=over
+
+=item format_extension
+
+This extension, together with the base name specified by the caller of
+the renderer, is used to look up the format specific template.
+
+=item binmode
+
+This value indicates which binmode to use for the output being generated.
+Valid values are C<':utf8'>, C<1> or C<0>.
+
+=back
+
+The configuration hash can be used as a communication channel between
+C<setup> and C<postprocess> by adding keys starting with an underscore (C<_>).
+
+=item initialize_template($parent, $config, $template)
+
+After the Template Toolkit engine has been initialized based on the
+values returned by C<setup>, the driver calls this function, if a format
+provides it.
+
+C<$config> corresponds with the second argument returned by C<setup>.
+
+C<$template> is an instance of a Template Toolkit template
+processor - its value can be used to register plugins if such is required
+for the specific format.
+
+=item postprocess($parent, $output, $config)
+
+After having evaluated the template, the driver calls this function. Its
+arguments are the instance of the driver C<$parent> (same as for C<setup>),
+C<$output> (the first item of the tuple returned by C<setup>) and the
+configuration hash C<$config>.
+
+This function does not have a defined return value, but should return
+C<undef> for forward compatibility.
+
+=item mimetype()
+
+Returns the MIME content-type for the rendered template.
+
+=back
+
+=head1 Copyright 2007-2018, The LedgerSMB Core Team
 
 This file is licensed under the GNU General Public License version 2, or at your
 option any later version.  A copy of the license should have been included with
@@ -173,169 +330,156 @@ package LedgerSMB::Template;
 use strict;
 use warnings;
 use Carp;
-
 use LedgerSMB::App_State;
 use LedgerSMB::Company_Config;
 use LedgerSMB::Locale;
-use LedgerSMB::Mailer;
 use LedgerSMB::Setting;
 use LedgerSMB::Sysconfig;
+use LedgerSMB::Template::DBProvider;
+
+use Template::Parser;
 use Log::Log4perl;
-use File::Copy "cp";
 use File::Spec;
+use Module::Runtime qw(use_module);
+use Scalar::Util qw(reftype);
+
+use parent qw( Exporter );
+our @EXPORT_OK = qw( preprocess );
 
 my $logger = Log::Log4perl->get_logger('LedgerSMB::Template');
 
 sub available_formats {
     my @retval = ('HTML', 'TXT');
-    local ($@);
-    if (eval {require LedgerSMB::Template::LaTeX}){
+
+    if ($LedgerSMB::Sysconfig::template_latex){
         push @retval, 'PDF', 'PS';
-    } else { $logger->debug($@) if $@; }
-    if (eval {require LedgerSMB::Template::XLS}){
+    }
+    if ($LedgerSMB::Sysconfig::template_xls){
         push @retval, 'XLS';
-    } else { $logger->debug($@) if $@; }
-    if (eval {require LedgerSMB::Template::XLSX}){
+    }
+    if ($LedgerSMB::Sysconfig::template_xlsx){
         push @retval, 'XLSX';
-    } else { $logger->debug($@) if $@; }
-    if (eval {require LedgerSMB::Template::ODS}){
+    }
+    if ($LedgerSMB::Sysconfig::template_ods){
         push @retval, 'ODS';
-    } else { $logger->debug($@) if $@; }
+    }
     return \@retval;
 }
 
 sub new {
     my $class = shift;
-    my $self = {};
     my %args = @_;
+    my $self = {
+        binmode => undef,
+    };
+    bless $self, $class;
 
-    $self->{myconfig} = $args{user};
-    $self->{template} = $args{template};
-    $self->{format} = $args{format};
-    $self->{language} = $args{language};
-    $self->{no_escape} = $args{no_escape};
-    $self->{debug} = $args{debug};
-    $self->{binmode} = undef;
-    $self->{outputfile} =
-        "${LedgerSMB::Sysconfig::tempdir}/$args{output_file}" if
-        $args{output_file};
+    $logger->trace('new(<args>), keys: ' . join '|', keys %args);
+    $logger->trace('output_options, keys: ' . join '|', keys %{$args{output_options}});
+
+    $self->{$_} = $args{$_}
+        for (qw( template format language no_escape debug locale
+                 format_options output_options additional_vars ));
+    $self->{user} = $args{user};
     $self->{include_path} = $args{path};
-    $self->{locale} = $args{locale};
-    $self->{noauto} = $args{no_auto_output};
-    $self->{method} = $args{method};
-    $self->{method} ||= $args{media};
-    $self->{format_args} = $args{format_options};
-    $self->{output_args} = $args{output_options};
     if ($self->{language}){ # Language takes precedence over locale
         $self->{locale} = LedgerSMB::Locale->get_handle($self->{language});
     }
 
     if (lc $self->{format} eq 'pdf') {
         $self->{format} = 'LaTeX';
-        $self->{format_args}{filetype} = 'pdf';
+        $self->{format_options}{filetype} = 'pdf';
     } elsif (lc $self->{format} eq 'ps' or lc $self->{format} eq 'postscript') {
         $self->{format} = 'LaTeX';
-        $self->{format_args}{filetype} = 'ps';
+        $self->{format_options}{filetype} = 'ps';
     } elsif (lc $self->{format} eq 'xlsx'){
         $self->{format} = 'XLSX';
-        $self->{format_args}{filetype} = 'xlsx';
-    } elsif (lc $self->{format} eq 'XML'){
-        $self->{format} = 'XML';
-        $self->{format_args}{filetype} = 'xml';
+        $self->{format_options}{filetype} = 'xlsx';
+    } elsif (lc $self->{format} eq 'xls'){
+        $self->{format} = 'XLSX';
+        $self->{format_options}{filetype} = 'xls';
     } elsif ($self->{format} =~ /edi$/i){
-        $self->{format_args}{extension} = lc $self->{format};
+        $self->{format_options}{extension} = lc $self->{format};
+        $self->{format_options}{filetype} = lc $self->{format};
         $self->{format} = 'TXT';
     }
-    bless $self, $class;
 
     if ($self->{format} !~ /^\p{IsAlnum}+$/) {
-        die "Invalid format";
+        die 'Invalid format';
     }
-    if (!$self->{include_path}){
-        $self->{include_path} = $self->{'myconfig'}->{'templates'};
-        $self->{include_path} ||= 'templates/demo';
-        if (defined $self->{language}){
-            if (!$self->_valid_language){
-                die 'Invalid language';
-                return undef;
-            }
-            $self->{include_path_lang} = "$self->{'include_path'}"
-                    ."/$self->{language}";
-                        $self->{locale}
-                             = LedgerSMB::Locale->get_handle($self->{language});
-        }
-    }
+    use_module("LedgerSMB::Template::$self->{format}")
+       or die "Failed to load module $self->{format}";
+
+    carp 'no_escape mode enabled in rendering'
+        if $self->{no_escape};
 
     return $self;
 }
 
 sub new_UI {
     my $class = shift;
-    return $class->new(@_, no_auto_ouput => 0, format => 'HTML', path => 'UI');
+    my $request = shift;
+
+    return $class->new(
+        @_,
+        format => 'HTML' ,
+        path => 'UI',
+        user => $request->{_user},
+        locale => $request->{_locale},
+        additional_vars => {
+            dojo_theme =>
+                ($LedgerSMB::App_State::Company_Config->{dojo_theme}
+                 // $LedgerSMB::Sysconfig::dojo_theme),
+        },
+    );
 }
 
-sub _valid_language {
-    my $self = shift;
-    if ($self->{language} =~ m#(/|\\|:|\.\.|^\.)#){
-        return 0;
-    }
-    return 1;
-}
-
-sub _preprocess {
+sub preprocess {
     my ($rawvars, $escape) = @_;
     return undef unless defined $rawvars;
 
-    local ($@);
+    local $@ = undef;
     if (eval {$rawvars->can('to_output')}){
         $rawvars = $rawvars->to_output;
     }
-    use LedgerSMB;
     my $type = ref $rawvars;
+    my $reftype = (reftype $rawvars) // ''; # '' is falsy, but works with EQ
     return $rawvars if $type =~ /^LedgerSMB::Locale/;
 
     my $vars;
-    if ( $type eq 'ARRAY' ) {
+    if ( $reftype and $reftype eq 'ARRAY' ) {
         $vars = [];
         for (@{$rawvars}) {
-            push @{$vars}, _preprocess( $_, $escape );
+            push @{$vars}, preprocess( $_, $escape );
         }
     } elsif (!$type) {
-        return defined($escape) ? &$escape($rawvars) : $rawvars;
-    } elsif ($type eq 'SCALAR' or $type eq 'Math::BigInt::GMP') {
-        return defined($escape) ? &$escape($$rawvars) : $$rawvars;
-    } elsif ($type eq 'CODE'){ # a code reference makes no sense
+        return $escape->($rawvars);
+    } elsif ($reftype eq 'SCALAR' or $type eq 'Math::BigInt::GMP') {
+        return $escape->($$rawvars);
+    } elsif ($reftype eq 'CODE'){ # a code reference makes no sense
         return $rawvars;
-    } elsif ($type eq 'IO::File'){
-        return undef;
-    } elsif ($type eq 'Apache2::RequestRec'){
-        # When running in mod_perl2, we might encounter an Apache2::RequestRec
-        # object; escaping its content is nonsense
-        return undef;
-    } else { # Hashes and objects
+    } elsif ($reftype eq 'HASH') { # Hashes and objects
         $vars = {};
         for ( keys %{$rawvars} ) {
-            $vars->{_preprocess($_, $escape)} = _preprocess( $rawvars->{$_}, $escape );
+            # don't encode the object's internals; TT won't forward anyway...
+            # btw, some (internal) objects are XS objects, on which this trick
+            # treating it as a hashref really doesn't work...
+            next if /^_/;
+            $vars->{$_} = preprocess( $rawvars->{$_}, $escape );
         }
     }
+    # return undef for GLOB references (includes IO::File objects)
     return $vars;
 }
 
 sub get_template_source {
-    my $self = shift;
-    my $get_template = shift;
+    my ($self, $format_extension) = @_;
 
     my $source;
-    if ($self->{include_path} eq 'DB'){
+    if ($self->{include_path} && $self->{include_path} eq 'DB'){
         $source = $self->{template};
-    } elsif (ref $self->{template} eq 'SCALAR') {
-        $source = $self->{template};
-    } elsif (ref $self->{template} eq 'ARRAY') {
-        $source = join "\n", @{$self->{template}};
-    } elsif (defined $get_template) {
-        $source = $get_template->($self->{template});
     } else {
-        $source = undef;
+        $source = $self->{template} . '.' . $format_extension;
     }
     return $source;
 }
@@ -344,10 +488,9 @@ sub get_template_args {
     my $self = shift;
     my $extension = shift;
     my $binmode = shift;
-    my $trim = shift // 0;
 
     my %additional_options = ();
-    if ($self->{include_path} eq 'DB'){
+    if ($self->{include_path} && $self->{include_path} eq 'DB'){
         $additional_options{INCLUDE_PATH} = [];
         $additional_options{LOAD_TEMPLATES} =
             [ LedgerSMB::Template::DBProvider->new(
@@ -360,388 +503,135 @@ sub get_template_args {
                       }),
                   }) ];
     }
-    my $paths = [$self->{include_path},'templates/demo','UI/lib'];
+    my $paths = ['UI/lib'];
+    unshift @$paths, $self->{include_path}
+        if defined $self->{include_path};
     unshift @$paths, $self->{include_path_lang}
         if defined $self->{include_path_lang};
     my $arghash = {
         INCLUDE_PATH => $paths,
         ENCODING => 'utf8',
+        TRIM => (!$binmode || $binmode eq ':utf8'),
         START_TAG => quotemeta('<?lsmb'),
         END_TAG => quotemeta('?>'),
         DELIMITER => ';',
-        TRIM => $trim,
         DEBUG => ($self->{debug})? 'dirs': undef,
         DEBUG_FORMAT => '',
         (%additional_options)
     };
 
     if ($LedgerSMB::Sysconfig::cache_templates
-        && $self->{include_path} ne 'DB') {
+        && (!$self->{include_path} || $self->{include_path} ne 'DB')) {
        # don't cache compiled database-retrieved templates
        # they will vary between databases
         $arghash->{COMPILE_EXT} = '.lttc';
         $arghash->{COMPILE_DIR} =
            File::Spec->rel2abs( $LedgerSMB::Sysconfig::templates_cache,
-                                $LedgerSMB::Sysconfig::tempdir );
+                                File::Spec->tmpdir );
     }
     $self->{binmode} = $binmode;
     return $arghash;
 }
 
+sub _tt_url {
+    my $str = shift;
+
+    $str =~ s/([^a-zA-Z0-9_.-])/sprintf("%%%02x", ord($1))/ge;
+    return $str;
+}
+
+sub _maketext {
+    my $self = shift;
+    my $escape = shift;
+
+    return $escape->(defined $self->{locale}
+                    ? $self->{locale}->maketext(@_)
+                    : shift);
+}
+
 sub _render {
     my $self = shift;
     my $vars = shift;
-    $vars->{LIST_FORMATS} = sub { return $self->available_formats} ;
+    my $cvars = shift;
     $vars->{ENVARS} = \%ENV;
-    $vars->{USER} = $LedgerSMB::App_State::User;
-    $vars->{USER} ||= {dateformat => 'yyyy-mm-dd'};
-    $vars->{CSSDIR} = $LedgerSMB::Sysconfig::cssdir;
+    $vars->{USER} = $self->{user};
     $vars->{DBNAME} = $LedgerSMB::App_State::DBName;
     $vars->{SETTINGS} = {
         default_currency =>
             (LedgerSMB::Setting->new(%$self)->get_currencies)[0],
         decimal_places => $LedgerSMB::Company_Config::decimal_places,
     } if $vars->{DBNAME} && LedgerSMB::App_State::DBH;
-    $vars->{LETTERHEAD} = sub { $self->_include('letterhead', $vars) };
-    my @stdformats = ();
-    for (qw(HTML PDF PS)){
-       if (scalar(grep {/^$_$/} $self->available_formats)){
-           push @stdformats, $_;
-       }
-    }
-    $vars->{STDFORMATS} = \@stdformats;
-    { # pre-5.14 compatibility block
-        local ($@); # pre-5.14, do not die() in this block
-        eval {
-            $vars->{PRINTERS} = [
-                {text => $LedgerSMB::App_State::Locale->text('Screen'),
-                 value => 'screen'},
-                ];
-        };
-    }
-    for (keys %LedgerSMB::Sysconfig::printers){
-        push @{$vars->{PRINTERS}}, { text => $_, value => $_ };
-    }
 
-    if ($self->{format} !~ /^\p{IsAlnum}+$/) {
-        die "Invalid format";
-    }
+    @{$vars->{PRINTERS}} =
+        map { { text => $_, value => $_ } }
+        keys %LedgerSMB::Sysconfig::printers;
+    unshift @{$vars->{PRINTERS}}, {
+        text => $LedgerSMB::App_State::Locale->text('Screen'),
+        value => 'screen'
+    } if $LedgerSMB::App_State::Locale;
+
     my $format = "LedgerSMB::Template::$self->{format}";
+    my $escape = $format->can('escape');
+    my $unescape = $format->can('unescape');
+    my $cleanvars = $self->{no_escape} ? $vars : preprocess($vars, $escape);
+    $cleanvars->{LIST_FORMATS} = sub { return $self->available_formats; };
+    $cleanvars->{escape} = sub { return $escape->(@_); };
+    $cleanvars->{UNESCAPE} = sub { return $unescape->(@_); }
+        if ($unescape && !$self->{no_escape});
+    $cleanvars->{text} = sub { return $self->_maketext($escape, @_); };
+    $cleanvars->{tt_url} = \&_tt_url;
+    $cleanvars->{$_} = $self->{additional_vars}->{$_}
+        for (keys %{$self->{additional_vars}});
+    $cleanvars->{$_} = $cvars->{$_}
+        for (keys %$cvars);
 
-    eval "require $format";
-    if ($@) {
-        die $@;
+    my $output;
+    my $config;
+    ($output, $config) = $format->can('setup')->($self, $cleanvars,
+                                                 \$self->{output});
+
+    my $arghash = $self->get_template_args(
+        $config->{input_extension},
+        $config->{binmode});
+    my $template = Template->new($arghash)
+        || die Template->error();
+
+    my $initialize_template = $format->can('initialize_template');
+    $initialize_template->($self, $config, $template)
+        if defined $initialize_template;
+
+    if (! $template->process(
+              $self->get_template_source($config->{input_extension}),
+              $cleanvars,
+              $output,
+              { binmode => $config->{binmode} })) {
+        my $err = $template->error();
+        die "Template error: $err" if $err;
     }
 
-    my $cleanvars;
-    if ($self->{no_escape}) {
-        carp 'no_escape mode enabled in rendering';
-        $cleanvars = $vars;
-    } else {
-        $cleanvars = $format->can('preprocess')->($vars);
-    }
-    $cleanvars->{escape} = sub { return $format->escape(@_)};
-    if (UNIVERSAL::isa($self->{locale}, 'LedgerSMB::Locale')){
-        $cleanvars->{text} = sub {
-                    return $self->escape($self->{locale}->maketext(@_))
-                        if defined $_[0]};
-    }
-    else {
-        $cleanvars->{text} = sub { return $self->escape(shift @_) };
-    }
-    $cleanvars->{tt_url} = sub {
-           my $str  = shift @_;
-
-           my $regex = qr/([^a-zA-Z0-9_.-])/;
-           $str =~ s/$regex/sprintf("%%%02x", ord($1))/ge;
-           return $str;
-    };
-
-    $format->can('process')->($self, $cleanvars);
-    # Will return undef if postprocessing if disabled -YL
-    my $post = $format->can('postprocess')->($self) unless $self->{_no_postprocess};
-    return $post;
+    $format->can('postprocess')->($self, $output, $config);
+    $self->{mimetype} = $format->can('mimetype')->($config);
+    return;
 }
 
 sub render {
     my $self = shift @_;
     my $vars = shift @_;
+    my $cvars = shift @_;
 
-    my $post = $self->_render($vars);
-
-    if (!$self->{'noauto'}) {
-        # Clean up
-        $logger->debug("before self output");
-        $self->output(%$vars);
-        $logger->debug("after self output");
-        if ($self->{rendered}) {
-            unlink($self->{rendered});
-        }
-    }
-
-    return $post;
+    $self->_render($vars, $cvars);
+    return $self;
 }
 
-sub render_to_psgi {
-    my $self = shift @_;
-    my $vars = shift @_;
-    my %args = ( @_ );
+=head1 LICENSE AND COPYRIGHT
 
-    $self->{outputfile} = undef;
-    $self->_render($vars);
+Copyright (C) 2007-2018 The LedgerSMB Core Team
 
-    my $charset = '';
-    $charset = '; charset=utf-8'
-        if $self->{mimetype} =~ m!^text/!;
+This file is licensed under the Gnu General Public License version 2, or at your
+option any later version.  A copy of the license should have been included with
+your software.
 
-    # $self->{mimetype} set by format
-    my $headers = [
-        'Content-Type' => "$self->{mimetype}$charset",
-        (@{$args{extra_headers} // []})
-        ];
+=cut
 
-    push @$headers, (
-        'Cache-Control' =>
-          'no-store, no-cache, must-revalidate, post-check=0, pre-check=0, false',
-        'Pragma' => 'no-cache'
-    ) if ($LedgerSMB::App_State::DBH && LedgerSMB::Setting->get('disable_back'));
-
-    my $body;
-    if ($self->{output}) {
-        $body = $self->{output};
-        utf8::encode($body)
-            if utf8::is_utf8($body);
-        $body = [ $body ];
-        push @$headers,
-            ( 'Content-Disposition' =>
-                  'attachment; filename="Report.' .
-                                lc($self->{format}) . '"'
-            ) if $self->{format} && 'html' ne lc $self->{format};
-    }
-    elsif ($self->{rendered}) {
-        open($body, '<:raw', $self->{rendered});
-        # as we don't support Windows anyway: unlinking an open file works!
-        unlink $self->{rendered};
-    }
-
-    return [ 200, $headers, $body ];
-}
-
-sub escape {
-    my ($self, $vars) = @_;
-    my $format = "LedgerSMB::Template::$self->{format}";
-    if ($format->can('escape')){
-         return $format->can('escape')->($vars);
-    } else {
-         return $vars;
-    }
-}
-
-sub output {
-    my $self = shift;
-    my %args = @_;
-
-    for ( keys %args ) { $self->{output_args}->{$_} = $args{$_}; };
-
-    my $method = $self->{method} || $args{method} || $args{media};
-    $method = '' if !defined $method;
-
-    if ('email' eq lc $method) {
-        $self->_email_output;
-    } elsif (defined $args{OUT} and $args{printmode} eq '>'){ # To file
-        cp($self->{rendered}, $args{OUT});
-        return if "zip" eq lc($method);
-    } elsif ('print' eq lc $method) {
-        $self->_lpr_output;
-    } elsif (defined $self->{output} or lc $method eq 'screen') {
-        $self->_http_output;
-    } elsif (defined $method and $method ne '' ) {
-        $self->_lpr_output;
-    } else {
-        $self->_http_output_file;
-    }
-}
-
-sub _http_output {
-    my ($self, $data) = @_;
-    LedgerSMB::App_State::cleanup();
-    $data ||= $self->{output};
-    my $cache = 1; # default
-    if ($LedgerSMB::App_State::DBH){
-        # we have a db connection, so are logged in.
-        # Let's see about caching.
-        $cache = 0 if LedgerSMB::Setting->get('disable_back');
-    }
-
-    if ($self->{format} !~ /^\p{IsAlnum}+$/) {
-        die "Invalid format";
-    }
-    if (!defined $data and defined $self->{rendered}){
-        $data = "";
-        $logger->trace("begin DATA < self->{rendered}=$self->{rendered} \$self->{format}=$self->{format}");
-        open (DATA, '<', $self->{rendered});
-                binmode DATA, $self->{binmode};
-        while (my $line = <DATA>){
-            $data .= $line;
-        }
-        $logger->trace("end DATA < self->{rendered}");
-        unlink($self->{rendered}) or die 'Unable to delete output file';
-    }
-
-    my $format = "LedgerSMB::Template::$self->{format}";
-    my $disposition = "";
-    my $name;
-    $name = $format->can('postprocess')->($self) if $format->can('postprocess');
-    $name ||= $self->{rendered};
-    if ($name) {
-        $name =~ s#^.*/##;
-        $disposition .= qq|\nContent-Disposition: attachment; filename="$name"|;
-    }
-    if (!$ENV{LSMB_NOHEAD}){
-        if (!$cache){
-            print "Cache-Control: no-store, no-cache, must-revalidate\n";
-            print "Cache-Control: post-check=0, pre-check=0, false\n";
-            print "Pragma: no-cache\n";
-        }
-        if ($self->{mimetype} =~ /^text/) {
-            print "Content-Type: $self->{mimetype}; charset=utf-8$disposition\n\n";
-        } else {
-            print "Content-Type: $self->{mimetype}$disposition\n\n";
-        }
-    }
-    binmode STDOUT, $self->{binmode};
-    print $data;
-    # change global resource back asap
-    binmode (STDOUT, ':utf8');
-    $logger->trace("end print to STDOUT");
-}
-
-sub _http_output_file {
-    my $self = shift;
-        LedgerSMB::App_State::cleanup();
-    my $FH;
-
-    open($FH, '<:bytes', $self->{rendered}) or
-        die 'Unable to open rendered file';
-    my $data;
-    {
-        local $/;
-        $data = <$FH>;
-    }
-    close($FH);
-
-    $self->_http_output($data);
-
-    unlink($self->{rendered}) or
-        die 'Unable to delete output file';
-}
-
-sub _email_output {
-    my $self = shift;
-    my $args = $self->{output_args};
-
-    my @mailmime;
-    if (!$self->{rendered} and !$args->{attach}) {
-        $args->{message} .= $self->{output};
-        @mailmime = ('contenttype', $self->{mimetype});
-    }
-
-        # User default for email from
-        $args->{from} ||= $self->{user}->{email};
-
-        # Default addresses
-        my $csettings = $LedgerSMB::Company_Config::settings;
-        $args->{from} ||= $csettings->{default_email_from};
-        $args->{to} ||= $csettings->{default_email_to};
-        $args->{cc} ||= $csettings->{default_email_cc};
-        $args->{bcc} ||= $csettings->{default_email_bcc};
-
-
-        # Mailer stuff
-    my $mail = new LedgerSMB::Mailer(
-        from => $args->{from},
-        to => $args->{to},
-        cc => $args->{cc},
-        bcc => $args->{bcc},
-        subject => $args->{subject},
-        notify => $args->{notify},
-        message => $args->{message},
-        @mailmime,
-    );
-    if ($args->{attach} or $self->{mimetype} !~ m#^text/# or $self->{rendered}) {
-        my @attachment;
-        my $name = $args->{filename};
-        if ($self->{rendered}) {
-            @attachment = ('file', $self->{rendered});
-            $name ||= $self->{rendered};
-        } else {
-            @attachment = ('data', $self->{output});
-        }
-        $mail->attach(
-            mimetype => $self->{mimetype},
-            filename => $name,
-            strip => $$,
-            @attachment,
-            );
-    }
-    $mail->send;
-}
-
-sub _lpr_output {
-    my ($self, $in_args) = shift;
-    my $args = $self->{output_args};
-    if ($self->{format} ne 'LaTeX') {
-        die "Invalid Format";
-    }
-    my $lpr = $LedgerSMB::Sysconfig::printer{$args->{media}};
-
-    open (LPR, '|-', $lpr);
-
-    # Output is not defined here.  In the future we should consider
-    # changing this to use the system command and hit the file as an arg.
-    #  -- CT
-    open (FILE, '<', "$self->{rendered}");
-    while (my $line = <FILE>){
-        print LPR $line;
-    }
-    close(LPR);
-}
-
-# apply locale settings to column headings and add sort urls if necessary.
-sub column_heading {
-
-    my $self = shift;
-    my ($names, $sortby) = @_;
-    my %sorturls;
-
-    if ($sortby) {
-        %sorturls = map
-        { $_ => $sortby->{href}."=$_"} @{$sortby->{columns}};
-    }
-
-    foreach my $attname (keys %$names) {
-
-        # process 2 cases - simple name => value, and complex name => hash
-        # pairs. The latter is used to include urls in column headers.
-
-        if (ref $names->{$attname} eq 'HASH') {
-            my $t = $self->{locale}->maketext($names->{$attname}{text});
-            $names->{$attname}{text} = $t;
-        } else {
-            my $t = $self->{locale}->maketext($names->{$attname});
-            if (defined $sorturls{$attname}) {
-                $names->{$attname} =
-                {
-                    text => $t,
-                     href => $sorturls{$attname}
-                };
-            } else {
-                $names->{$attname} = $t;
-            }
-        }
-    }
-
-    return $names;
-}
 
 1;

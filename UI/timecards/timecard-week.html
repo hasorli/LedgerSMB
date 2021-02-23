@@ -1,5 +1,4 @@
-<?lsmb INCLUDE "ui-header.html" dojo_parse='onload';
-PROCESS "elements.html" ?>
+<?lsmb PROCESS "elements.html" ?>
 <body class="lsmb <?lsmb dojo_theme ?>">
 <form data-dojo-type="lsmb/Form" action="timecard.pl" method="post">
 <?lsmb
@@ -48,7 +47,7 @@ FOREACH bu IN b_units;
 END;
 ?>
 <div class="listtop"><?lsmb text('Weekly Time and Materials Entry') ?></div>
-<table width="100%" cols=7
+<table width="100%"
  id="timecard-weekly">
 <tr class="listtop">
  <th><?lsmb transdates.0 ?></th>
@@ -133,4 +132,3 @@ END;
 </div>
 </form>
 </body>
-</html>

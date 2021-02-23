@@ -1,19 +1,11 @@
 
 package LedgerSMB::Scripts::account;
-use Template;
-use LedgerSMB::DBObject::Account;
-use LedgerSMB::DBObject::EOY;
-use Log::Log4perl;
-use strict;
-use warnings;
-
-=pod
 
 =head1 NAME
 
 LedgerSMB:Scripts::accounts - web entry points for managing GL accounts
 
-=head1 SYNOPSIS
+=head1 DESCRIPTION
 
 This module contains the workflows for managing chart of accounts entries.
 
@@ -27,8 +19,16 @@ maintainable.
 
 =cut
 
+use strict;
+use warnings;
 
-my $logger = Log::Log4perl::get_logger("LedgerSMB::DBObject::Account");
+use Template;
+use LedgerSMB::DBObject::Account;
+use LedgerSMB::DBObject::EOY;
+use Log::Log4perl;
+
+
+my $logger = Log::Log4perl::get_logger('LedgerSMB::DBObject::Account');
 
 
 =item new
@@ -91,9 +91,9 @@ link:  a list of strings representing text box identifier.
 
 sub save {
     my ($request) = @_;
-    {
-      no warnings 'uninitialized';
-      $request->{parent} = undef if $request->{parent} == -1;
+
+    if ( defined $request->{parent} and $request->{parent} == -1 ) {
+        $request->{parent} = undef;
     }
     die $request->{_locale}->text('Please select a valid heading')
        if (defined $request->{heading}
@@ -160,7 +160,7 @@ sub _display_account_screen {
 
     $hiddens->{type} = 'account';
     $hiddens->{$_} = $form->{$_} foreach qw(id inventory_accno_id income_accno_id expense_accno_id fxgain_accno_id fxloss_accno_id);
-    $checked->{ $form->{charttype} } = "checked";
+    $checked->{ $form->{charttype} } = 'checked';
 
     my %button = ();
 
@@ -198,7 +198,7 @@ sub _display_account_screen {
         format => 'HTML',
         path   => 'UI',
         template => 'accounts/edit');
-    return $template->render_to_psgi({
+    return $template->render({
         form => $form,
         checked => $checked,
         buttons => $buttons,
@@ -219,11 +219,9 @@ sub yearend_info {
     $eoy->{closed_date} = $eoy->latest_closing;
     $eoy->{user} = $request->{_user};
     my $template = LedgerSMB::Template->new_UI(
-        user => $request->{_user},
-        locale => $request->{_locale},
-        template => 'accounts/yearend'
-    );
-    return $template->render_to_psgi({ request => $request,
+        $request,
+        template => 'accounts/yearend');
+    return $template->render({ request => $request,
                                        eoy => $eoy});
 }
 
@@ -244,11 +242,10 @@ sub post_yearend {
     my $eoy =  LedgerSMB::DBObject::EOY->new({base => $request});
     $eoy->close_books;
     my $template = LedgerSMB::Template->new_UI(
-        user => $request->{_user},
-        locale => $request->{_locale},
+        $request,
         template => 'accounts/yearend_complete'
     );
-    return $template->render_to_psgi($eoy);
+    return $template->render($eoy);
 }
 
 =item close_period
@@ -286,7 +283,7 @@ sub reopen_books {
 
 =back
 
-=head1 COPYRIGHT
+=head1 LICENSE AND COPYRIGHT
 
 Copyright (C) 2009 LedgerSMB Core Team.  This file is licensed under the GNU
 General Public License version 2, or at your option any later version.  Please

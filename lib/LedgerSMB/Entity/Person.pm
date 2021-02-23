@@ -1,6 +1,14 @@
+
+package LedgerSMB::Entity::Person;
+
 =head1 NAME
 
 LedgerSMB::Entity::Person -- Natural Person handling for LedgerSMB
+
+=head1 DESCRIPTION
+
+Derived from LedgerSMB::Entity, implements mapping of 'person' fields
+to the database.
 
 =head1 SYNOPSIS
 
@@ -27,8 +35,8 @@ To get by control code:
 
 =cut
 
-package LedgerSMB::Entity::Person;
 use Moose;
+use namespace::autoclean;
 extends 'LedgerSMB::Entity';
 use LedgerSMB::MooseTypes;
 
@@ -175,12 +183,12 @@ Saves the item and populates db defaults in id and created.
 sub save {
     my ($self) = @_;
     my ($ref) = $self->call_dbmethod(funcname => 'person__save');
-    $self->entity_id(values %$ref);
+    return $self->entity_id(values %$ref);
 }
 
 =back
 
-=head1 COPYRIGHT
+=head1 LICENSE AND COPYRIGHT
 
 Copyright (C) 2012, the LedgerSMB Core Team.  This file may be re-used under the GNU GPL
 version 2 or at your option any future version.  Please see the accompanying LICENSE

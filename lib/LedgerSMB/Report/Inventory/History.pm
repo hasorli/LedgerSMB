@@ -1,3 +1,6 @@
+
+package LedgerSMB::Report::Inventory::History;
+
 =head1 NAME
 
 LedgerSMB::Report::Inventory::History - Sales/Purchase History for Goods
@@ -8,8 +11,8 @@ LedgerSMB::Report::Inventory::History - Sales/Purchase History for Goods
 
 =cut
 
-package LedgerSMB::Report::Inventory::History;
 use Moose;
+use namespace::autoclean;
 extends 'LedgerSMB::Report';
 with 'LedgerSMB::Report::Dates';
 
@@ -194,12 +197,12 @@ sub name {
 sub run_report {
     my ($self) = @_;
     my @rows = $self->call_dbmethod(funcname => 'goods__history');
-    $self->rows(
+    return $self->rows(
         [  map { { (%$_, (row_id => $_->{id})) } } @rows ]
     );
 }
 
-=head1 COPYRIGHT
+=head1 LICENSE AND COPYRIGHT
 
 COPYRIGHT (C) 2012 The LedgerSMB Core Team.  This file may be re-used under the
 terms of the LedgerSMB General Public License version 2 or at your option any

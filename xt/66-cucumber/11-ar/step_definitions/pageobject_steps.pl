@@ -1,7 +1,7 @@
 #!perl
 
 
-use lib 't/lib';
+use lib 'xt/lib';
 use strict;
 use warnings;
 
@@ -17,9 +17,6 @@ use PageObject::App::Login;
 
 use Test::More;
 use Test::BDD::Cucumber::StepFile;
-
-
-use Data::Dumper;
 
 
 When qr/I open the sales invoice entry screen/, sub {

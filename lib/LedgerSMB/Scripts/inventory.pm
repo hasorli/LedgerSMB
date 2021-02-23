@@ -1,21 +1,17 @@
-=pod
+
+package LedgerSMB::Scripts::inventory;
 
 =head1 NAME
 
-LedgerSMB::Scripts::inventory - LedgerSMB class defining the Controller
-functions, template instantiation and rendering for inventory management.
+LedgerSMB::Scripts::inventory - Web entry points for inventory adjustment
 
-=head1 SYOPSIS
+=head1 DESCRIPTION
 
-This module is the UI controller for the customer DB access; it provides the
-View interface, as well as defines the Save customer.
-Save customer will update or create as needed.
-
+This module implements inventory adjustment entry points.
 
 =head1 METHODS
 
 =cut
-package LedgerSMB::Scripts::inventory;
 
 use strict;
 use warnings;
@@ -43,7 +39,7 @@ sub begin_adjust {
     path => 'UI/inventory',
         format => 'HTML'
     );
-    return $template->render_to_psgi($request);
+    return $template->render($request);
 }
 
 =item enter_adjust
@@ -61,7 +57,7 @@ sub enter_adjust {
     path => 'UI/inventory',
         format => 'HTML'
     );
-    return $template->render_to_psgi($request);
+    return $template->render($request);
 }
 
 
@@ -77,16 +73,16 @@ sub adjustment_next {
     my ($request) = @_;
     my $adjustment = LedgerSMB::Inventory::Adjust->new(%$request);
     for my $i (1 .. $request->{rowcount}){
-        if ($request->{"id_$i"} eq "new" or !$request->{"id_$i"}){
+        if ($request->{"id_$i"} eq 'new' or not $request->{"id_$i"}){
             my $item = $adjustment->get_part_at_date(
-        $request->{transdate}, $request->{"partnumber_$i"});
+                $request->{transdate}, $request->{"partnumber_$i"});
             $request->{"id_$i"} = $item->{id};
             $request->{"description_$i"} = $item->{description};
             $request->{"onhand_$i"} = $item->{onhand};
         }
         $request->{"counted_$i"} ||= 0;
-        $request->{"qty_$i"} = $request->{"onhand_$i"}
-        - $request->{"counted_$i"};
+        $request->{"qty_$i"} =
+            $request->{"onhand_$i"} - $request->{"counted_$i"};
     }
     ++$request->{rowcount};
     return enter_adjust($request);
@@ -99,10 +95,30 @@ invoices.
 
 =cut
 
+sub _lines_from_form {
+    my ($adjustment, $hashref) = @_;
+    my @lines;
+    for my $ln (1 .. $hashref->{rowcount}){
+        next
+          if $hashref->{"id_$ln"} eq 'new';
+        my $line = LedgerSMB::Inventory::Adjust_Line->new(
+          parts_id => $hashref->{"id_$ln"},
+         partnumber => $hashref->{"partnumber_$ln"},
+            counted => $hashref->{"counted_$ln"},
+           expected => $hashref->{"onhand_$ln"},
+           variance => $hashref->{"onhand_$ln"} - $hashref->{"counted_$ln"});
+        push @lines, $line;
+    }
+    my $rows = $adjustment->rows;
+    push @$rows, @lines;
+    return $adjustment->rows($rows);
+}
+
+
 sub adjustment_save {
     my ($request) = @_;
     my $adjustment = LedgerSMB::Inventory::Adjust->new(%$request);
-    $adjustment->lines_from_form($request);
+    _lines_from_form($adjustment, $request);
     $adjustment->save;
     return begin_adjust($request);
 }
@@ -114,7 +130,7 @@ sub adjustment_save {
 sub adjustment_list {
     my ($request) = @_;
     my $report = LedgerSMB::Report::Inventory::Adjustments->new(%$request);
-    return $report->render_to_psgi($request);
+    return $report->render($request);
 }
 
 =item adjustment_approve
@@ -142,5 +158,15 @@ sub adjustment_delete {
     $request->{report_name} = 'list_inventory_counts';
     return LedgerSMB::Scripts::reports::start_report($request);
 }
+
+=head1 LICENSE AND COPYRIGHT
+
+Copyright (C) 2011-2018 The LedgerSMB Core Team
+
+This file is licensed under the Gnu General Public License version 2, or at your
+option any later version.  A copy of the license should have been included with
+your software.
+
+=cut
 
 1;

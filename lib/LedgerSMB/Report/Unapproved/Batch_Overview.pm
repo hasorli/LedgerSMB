@@ -1,3 +1,6 @@
+
+package LedgerSMB::Report::Unapproved::Batch_Overview;
+
 =head1 NAME
 
 LedgerSMB::Report::Unapproved::Batch_Overview - Search Batches in
@@ -26,8 +29,8 @@ use LedgerSMB::Report::Unapproved::Batch_Detail instead.
 
 =cut
 
-package LedgerSMB::Report::Unapproved::Batch_Overview;
 use Moose;
+use namespace::autoclean;
 extends 'LedgerSMB::Report';
 
 use LedgerSMB::Business_Unit_Class;
@@ -268,12 +271,12 @@ sub run_report{
     for my $r (@rows){
        $r->{row_id} = $r->{id};
     }
-    $self->rows(\@rows);
+    return $self->rows(\@rows);
 }
 
 =back
 
-=head1 COPYRIGHT
+=head1 LICENSE AND COPYRIGHT
 
 COPYRIGHT (C) 2012 The LedgerSMB Core Team.  This file may be re-used following
 the terms of the GNU General Public License version 2 or at your option any

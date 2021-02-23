@@ -1,3 +1,6 @@
+
+package LedgerSMB::Report::Listings::Language;
+
 =head1 NAME
 
 LedgerSMB::Report::Listings::Language - List languages for LedgerSMB
@@ -8,8 +11,8 @@ LedgerSMB::Report::Listings::Language - List languages for LedgerSMB
 
 =cut
 
-package LedgerSMB::Report::Listings::Language;
 use Moose;
+use namespace::autoclean;
 extends 'LedgerSMB::Report';
 
 =head1 DESCRIPTION
@@ -78,10 +81,10 @@ sub run_report {
     for my $row(@rows){
         $row->{row_id} = $row->{code};
     }
-    $self->rows(\@rows);
+    return $self->rows(\@rows);
 }
 
-=head1 COPYRIGHT
+=head1 LICENSE AND COPYRIGHT
 
 Copyright(C) 2013 The LedgerSMB Core Team.  This file may be reused in
 accordance with the GNU General Public License (GNU GPL) version 2.0 or, at your

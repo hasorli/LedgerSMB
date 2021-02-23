@@ -1,3 +1,6 @@
+
+package LedgerSMB::Report::Contact::History;
+
 =head1 NAME
 
 LedgerSMB::Report::Contact::History - Purchase history reports
@@ -24,8 +27,8 @@ both customers and vendors.
 
 =cut
 
-package LedgerSMB::Report::Contact::History;
 use Moose;
+use namespace::autoclean;
 extends 'LedgerSMB::Report';
 with 'LedgerSMB::Report::Dates';
 
@@ -335,12 +338,12 @@ sub run_report {
      #$r->{invnumber_href_suffix} = $r->{invoice_id};
      $r->{invnumber_href_suffix} = "$script?action=edit&id=$r->{inv_id}";
     }
-    $self->rows(\@rows);
+    return $self->rows(\@rows);
 }
 
 =back
 
-=head1 COPYRIGHT
+=head1 LICENSE AND COPYRIGHT
 
 COPYRIGHT (C) 2012 The LedgerSMB Core Team.  This file may be re-used following
 the terms of the GNU General Public License version 2 or at your option any

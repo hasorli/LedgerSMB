@@ -1,3 +1,6 @@
+
+package LedgerSMB::Setting::Sequence;
+
 =head1 NAME
 
 LedgerSMB::Setting::Sequence - Sequence per Setting Handling for LedgerSMB
@@ -19,10 +22,10 @@ To save a sequence:
 
 =cut
 
-package LedgerSMB::Setting::Sequence;
-use LedgerSMB::Setting;
+use LedgerSMB::Setting qw( increment_process );
 use Carp;
 use Moose;
+use namespace::autoclean;
 with 'LedgerSMB::PGObject';
 
 =head1 DESCRIPTION
@@ -172,7 +175,7 @@ sub increment {
     my ($ref) = __PACKAGE__->call_procedure(funcname => 'sequence__increment',
                                           args => [$label]);
     my ($value) = values %$ref;
-    return LedgerSMB::Setting::_increment_process($value, $vars);
+    return increment_process($value, $vars);
 
 }
 
@@ -214,7 +217,7 @@ sub delete {
                                      args => [$label]);
 }
 
-=head1 COPYRIGHT
+=head1 LICENSE AND COPYRIGHT
 
 COPYRIGHT(C) 2013 The LedgerSMB Core Team.  This file may be used in accordance
 with the GNU General Public License version 2 or at your option any later

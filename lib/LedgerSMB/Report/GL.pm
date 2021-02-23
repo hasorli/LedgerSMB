@@ -1,3 +1,6 @@
+
+package LedgerSMB::Report::GL;
+
 =head1 NAME
 
 LedgerSMB::Report::GL - GL Reports for LedgerSMB
@@ -23,8 +26,8 @@ searching for and reporting financial transactions.
 
 =cut
 
-package LedgerSMB::Report::GL;
 use Moose;
+use namespace::autoclean;
 extends 'LedgerSMB::Report';
 with 'LedgerSMB::Report::Dates', 'LedgerSMB::Report::Approval_Option';
 
@@ -165,7 +168,7 @@ sub columns {
     );
     my @bclasses = LedgerSMB::Business_Unit_Class->list('1', 'gl');
     for my $class (@bclasses){
-        push @COLS, {col_id =>  "bc_" . $class->id,
+        push @COLS, {col_id =>  'bc_' . $class->id,
                        name => LedgerSMB::Report::maketext($class->label),
                        type => 'text',
                      pwidth => '2'};
@@ -362,12 +365,12 @@ sub run_report{
         }
         $self->process_bclasses($ref);
     }
-    $self->rows(\@rows);
+    return $self->rows(\@rows);
 }
 
 =back
 
-=head1 COPYRIGHT
+=head1 LICENSE AND COPYRIGHT
 
 COPYRIGHT (C) 2012 The LedgerSMB Core Team.  This file may be re-used following
 the terms of the GNU General Public License version 2 or at your option any

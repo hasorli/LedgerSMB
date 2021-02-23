@@ -6,10 +6,6 @@ LedgerSMB::PGOld - Old DBObject replacement for 1.3-era LedgerSMB code
 
 This is like DBObject but uses the PGObject::Simple for base functionality.
 
-=head1 METHODS
-
-See PGObject::Simple
-
 =cut
 
 # This is temporary until we can get rid of it.  Basically the following
@@ -29,12 +25,23 @@ use LedgerSMB::App_State;
 
 =head1 METHODS
 
+See PGObject::Simple
+
 =over
 
 =item new(%args)
-=item rew(\%args)
 
 Constructor.
+
+Recognized arguments are:
+
+=over
+
+=item base
+
+A hashref which is imported as properties of the new object.
+
+=back
 
 =cut
 
@@ -45,8 +52,11 @@ sub new {
         $args->{dbh} = $args->{_DBH};
         delete $args->{_DBH};
     };
-    my $mergelist = $args->{mergelist} || [keys %{$args->{base}}];
-    my $self = { map { $_ => $args->{base}->{$_} } @$mergelist };
+
+    # key/value pairs from the `base` argument become
+    # properties of the new object.
+    my $self = { map { $_ => $args->{base}->{$_} } keys %{$args->{base}} };
+
     $self =  PGObject::Simple::new($pkg, %$self);
     $self->__validate__  if $self->can('__validate__');
     return $self;
@@ -64,25 +74,17 @@ sub set_dbh {
     return  LedgerSMB::App_State::DBH();
 }
 
-sub _parse_array {
-    my ($self, $value) = @_;
-    return @$value if ref $value eq 'ARRAY';
-    return if !defined $value;
-    # No longer needed since we require DBD::Pg 2.x
-}
+=item dbh
 
-sub _db_array_scalars {
-    my $self = shift @_;
-    my @args = @_;
-    return \@args;
-    # No longer needed since we require DBD::Pg 2.x
-}
+This is a wrapper around PGObject::Simple->dbh with the exception that we provide a
+a static/class invocation possibility as well.
 
-sub _db_array_literal {
-    my $self = shift @_;
-    my @args = @_;
-    return \@args;
-    # No longer needed since we require DBD::Pg 2.x
+=cut
+
+sub dbh {
+    my ($self) = @_;
+    return $self->SUPER::dbh() if ref $self;
+    return LedgerSMB::App_State::DBH();
 }
 
 =item $self->merge(\%base, %args)

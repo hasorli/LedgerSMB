@@ -1,16 +1,29 @@
-#  This is the new configuration file for LedgerSMB.  Eventually all system
-# configuration directives will go here,  This will probably not fully replace
-# the ledgersmb.conf until 1.3, however.
 
 package LedgerSMB::Sysconfig;
+
+=head1 NAME
+
+LedgerSMB::Sysconfig - LedgerSMB configuration management
+
+=head1 DESCRIPTION
+
+LedgerSMB configuration management
+
+=head1 METHODS
+
+This module doesn't specify any methods.
+
+=cut
+
 use strict;
 use warnings;
-use Cwd;
 
 use Config;
 use Config::IniFiles;
 use DBI qw(:sql_types);
 use English qw(-no_match_vars);
+
+
 
 =head2 die_pretty $line_1, $line_2, $line_N;
 
@@ -32,7 +45,7 @@ each $line_* is a string that will be output on a separate line:
 
 sub die_pretty {
     my $dieHeader = '==============================================================================';
-    my $msg = "== " . join("\n== ",@_);
+    my $msg = '== ' . join("\n== ",@_);
     die("\n" . $dieHeader . "\n$msg\n" . $dieHeader . "\n" .' Stopped at '); # trailing "<space>" prevents the location hint from being lost when pushing it to a newline
 }
 
@@ -51,19 +64,54 @@ our %docs;
 
 =head2 def $name, %args;
 
-keys in %args can be:
+A function to define config keys and set their values on initialisation.
+
+A value for the key will be sourced from the following with the first found having priority.
+
+=over
+
+=over
+
+=item - ENV VAR
+
+=item - Config File
+
+=item - Default
+
+=back
+
+=back
+
+=head2 keys in %args can be:
 
 =over
 
 =item section
 
+section name
+
 =item key
+
+The key name
 
 =item default
 
+default value if otherwise not specified (no env var and no config file entry)
+
 =item envvar
 
+The name of an associated Environment Variable.
+If the EnvVar is set it will be used to override the config file
+Regardless, the EnvVar will be set based on the config file or coded default
+
 =item suffix
+
+If set specifies a suffix to be appended to any value provided via the config file, defaults, or ENV Var.
+If used, often this would be configured as '-$EUID' or '-$PID'
+
+=item doc
+
+A description of the use of this key. Should normally be a scalar.
 
 =back
 
@@ -82,15 +130,22 @@ sub def {
 
     $docs{$sec}->{$key} = $args{doc};
     {
-        ## no critic (strict);
-        no strict 'refs';
-        no warnings 'redefine';
-        ${$name} = $cfg->val($sec, $key, $default);
+
+        ## no critic (ProhibitNoStrict)
+        no strict 'refs';           ## no critic (ProhibitProlongedStrictureOverride ) # sniff  # needed as we use the contents of a variable as the main variable name
+        no warnings 'redefine';     ## no critic ( ProhibitNoWarnings ) # sniff
+        ${$name} = $cfg->val($sec, $key, $default);     # get the value of config key $section.$key.  If it doesn't exist use $default instead
         if (defined $suffix) {
-            ${$name} = "${$name}$suffix";
+            ${$name} = "${$name}$suffix";               # Append a value suffix if defined, probably something like $EUID or $PID etc
         }
-        $ENV{$envvar} = $cfg->val($sec, $key, $default)
-            if $envvar && defined $cfg->val($sec, $key, $default);
+
+        ${$name} = $ENV{$envvar} if ( $envvar && defined $ENV{$envvar} );  # If an environment variable is associated and currently defined, override the configfile and default with the ENV VAR
+
+        # If an environment variable is associated, set it  based on the
+        # current value (taken from the config file, default, or pre-existing
+        #  env var.
+        $ENV{$envvar} = ${$name}    ## no critic   # sniff
+            if $envvar && defined ${$name};
 
         # create a functional interface
         *{$name} = sub {
@@ -101,9 +156,129 @@ sub def {
             return $cv;
         };
     }
+    return;
 }
 
 
+
+### SECTION  ---   debug
+
+def 'dojo_built',
+    section => 'debug',
+    default => 1,
+    doc => q{};
+
+    # Debug Panels
+
+def 'DBIProfile',
+    section => 'debug',
+    default => 0,
+    doc => q{};
+
+def 'DBIProfile_profile',
+    section => 'debug',
+    default => 2,
+    doc => q{};
+
+def 'DBITrace',
+    section => 'debug',
+    default => 1,
+    doc => q{};
+
+def 'DBITrace_level',
+    section => 'debug',
+    default => 2,
+    doc => q{};
+
+def 'Environment',
+    section => 'debug',
+    default => 0,
+    doc => q{};
+
+def 'InteractiveDebugger',
+    section => 'debug',
+    default => 0,
+    doc => q{};
+
+def 'LazyLoadModules',
+    section => 'debug',
+    default => 1,
+    doc => q{};
+
+def 'Log4perl',
+    section => 'debug',
+    default => 1,
+    doc => q{};
+
+def 'Memory',
+    section => 'debug',
+    default => 0,
+    doc => q{};
+
+def 'ModuleVersions',
+    section => 'debug',
+    default => 0,
+    doc => q{};
+
+def 'NYTProf',
+    section => 'debug',
+    default => 1,
+    doc => q{};
+
+def 'NYTProf_exclude',
+    section => 'debug',
+    default => [qw(.*\.css .*\.png .*\.ico .*\.js .*\.gif .*\.html)],
+    doc => q{};
+
+def 'NYTProf_minimal',
+    section => 'debug',
+    default => 1,
+    doc => q{};
+
+def 'Parameters',
+    section => 'debug',
+    default => 0,
+    doc => q{};
+
+def 'PerlConfig',
+    section => 'debug',
+    default => 0,
+    doc => q{};
+
+def 'Response',
+    section => 'debug',
+    default => 0,
+    doc => q{};
+
+def 'Session',
+    section => 'debug',
+    default => 0,
+    doc => q{};
+
+def 'Timer',
+    section => 'debug',
+    default => 0,
+    doc => q{};
+
+def 'TraceENV',
+    section => 'debug',
+    default => 1,
+    doc => q{};
+
+def 'TraceENV_method',
+    section => 'debug',
+    default => [qw/fetch store exists delete clear scalar firstkey nextkey/],
+    doc => q{};
+
+def 'W3CValidate',
+    section => 'debug',
+    default => 1,
+    doc => q{};
+
+def 'W3CValidate_uri',
+    section => 'debug',
+    default => 'http://validator.w3.org/check',
+    doc => q{};
 
 ### SECTION  ---   main
 
@@ -111,97 +286,65 @@ sub def {
 def 'auth',
     section => 'main',
     default => 'DB',
-    doc => qq||;
+    doc => q{};
 
 def 'dojo_theme',
     section => 'main',
     default => 'claro',
-    doc => qq||;
+    doc => q{};
 
 def 'force_username_case',
     section => 'main',
     default => undef,  # don't force case
-    doc => qq||;
+    doc => q{};
 
 def 'max_post_size',
     section => 'main',
-    default => 1024 * 1024,
-    doc => qq||;
+    default => 4194304, ## no critic ( ProhibitMagicNumbers)
+    doc => q{};
 
 def 'cookie_name',
     section => 'main',
-    default => "LedgerSMB-1.3",
-    doc => qq||;
+    default => 'LedgerSMB-1.3',
+    doc => q{};
 
 # Maximum number of invoices that can be printed on a check
 def 'check_max_invoices',
     section => 'main',
     default => 5,
-    doc => qq||;
+    doc => q{};
 
 # set language for login and admin
 def 'language',
     section => 'main',
     default => 'en',
-    doc => qq||;
+    doc => q{};
+
+def 'date_format',
+    section => 'main',
+    default => 'yyyy-mm-dd',
+    dock => q{Specifies the date format to be used for the database
+admin application (setup.pl).
+
+Note that the browser locale (language) will be used when this value isn't set.
+The default is to use the iso date format (yyyy-mm-dd).};
 
 def 'log_level',
     section => 'main',
     default => 'ERROR',
-    doc => qq||;
+    doc => q{};
 
 def 'DBI_TRACE',
     section => 'main', # SHOULD BE 'debug' ????
     default => 0,
-    doc => qq||;
-
-def 'no_db_str',
-    section => 'main',
-    default => 'database',
-    doc => qq||;
-
-def 'db_autoupdate',
-    section => 'main',
-    default => undef,
-    doc => qq||;
+    doc => q{};
 
 def 'cache_templates',
     section => 'main',
     default => 0,
-    doc => qq||;
-
+    doc => q{};
 
 ### SECTION  ---   paths
-
-def 'pathsep',
-    section => 'main', # SHOULD BE 'paths' ????
-    default => ':',
-    doc => qq|
-The documentation for the 'main.pathsep' key|;
-
-def 'cssdir',
-    section => 'main', # SHOULD BE 'paths' ????
-    default => 'css/',
-    doc => qq||;
-
-def 'fs_cssdir',
-    section => 'main', # SHOULD BE 'paths' ????
-    default => 'css/',
-    doc => qq||;
-
-# Temporary files stored at"
-def 'tempdir',
-    section => 'main', # SHOULD BE 'paths' ????
-    default => sub { $ENV{TEMP} || '/tmp/ledgersmb' },
-    envvar => 'HOME',
-    suffix => "-$EUID",
-    doc => qq||;
-
-# Backup files stored at"
-def 'backupdir',
-    section => 'paths',
-    default => sub { $ENV{BACKUP} || "/tmp/ledgersmb-backups" },
-    doc => qq||;
 
 # Path to the translation files
 def 'localepath',
@@ -214,18 +357,40 @@ def 'localepath',
 def 'spool',
     section => 'paths',
     default => 'spool',
-    doc => qq||;
+    doc => q{};
 
 # templates base directory
 def 'templates',
     section => 'paths',
     default => 'templates',
-    doc => qq||;
+    doc => q{};
 
 def 'templates_cache',
     section => 'paths',
     default => 'lsmb_templates',
-    doc => qq|this is a subdir of tempdir, unless it's an absolute path|;
+    doc => q{this is a subdir of tempdir, unless it's an absolute path};
+
+### SECTION  ---   Template file formats
+
+def 'template_latex',
+    section => 'template_format',
+    default => 0,
+    doc => q{Set to 'disabled' to prevent LaTeX output formats (Postscript and PDF) being made available};
+
+def 'template_xls',
+    section => 'template_format',
+    default => 0,
+    doc => q{Set to 'disabled' to prevent XLS output formats being made available};
+
+def 'template_xlsx',
+    section => 'template_format',
+    default => 0,
+    doc => q{Set to 'disabled' to prevent XLSX output formats being made available};
+
+def 'template_ods',
+    section => 'template_format',
+    default => 0,
+    doc => q{Set to 'disabled' to prevent ODS output formats being made available};
 
 
 ### SECTION  ---   mail
@@ -233,38 +398,37 @@ def 'templates_cache',
 def 'sendmail',
     section => 'mail',
     default => '/usr/sbin/sendmail -t',
-    doc => qq|location of sendmail|;
-
+    doc => q{The sendmail command used for sending e-mail. Applies only when smtphost is not defined.};
 
 def 'smtphost',
     section => 'mail',
-    default => '',
-    doc => '';
+    default => undef,
+    doc => 'Connect to this SMTP host to send e-mails. If defined, used instead of sendmail.';
+
+def 'smtpport',
+    section => 'mail',
+    default => 25,
+    doc => 'Connect to the smtp host using this port.';
 
 def 'smtptimeout',
     section => 'mail',
     default => 60,
-    doc => '';
+    doc => 'Timeout in seconds for smtp connections.';
 
 def 'smtpuser',
     section => 'mail',
-    default => '',
-    doc => '';
+    default => undef,
+    doc => 'Optional username used when connecting to smtp server.';
 
 def 'smtppass',
     section => 'mail',
-    default => '',
-    doc => '';
-
-def 'smtpauthmethod',
-    section => 'mail',
-    default => '',
-    doc => '';
+    default => undef,
+    doc => 'Optional password used when connecting to smtp server.';
 
 def 'backup_email_from',
     section => 'mail',
-    default => '',
-    doc => '';
+    default => undef,
+    doc => 'The e-mail address from which backups are sent.';
 
 
 ### SECTION  ---   database
@@ -273,12 +437,14 @@ def 'db_host',
     key => 'host',
     section => 'database',
     envvar => 'PGHOST',
+    default => 'localhost',
     doc => '';
 
 def 'db_port',
     key => 'port',
     section => 'database',
     envvar => 'PGPORT',
+    default => '5432',
     doc => '';
 
 def 'default_db',
@@ -293,31 +459,9 @@ def 'db_namespace',
 
 def 'db_sslmode',
     section => 'database',
-    default => undef,
+    default => 'prefer',
     envvar => 'PGSSLMODE',
     doc => '';
-
-
-### SECTION  ---   debug
-
-def 'dojo_built',
-    section => 'debug',
-    default => 1,
-    doc => qq||;
-
-
-
-
-### WHAT DOES THIS DO???
-our @io_lineitem_columns = qw(unit onhand sellprice discount linetotal);
-
-
-
-
-
-# if you have latex installed set to 1
-###TODO-LOCALIZE-DOLLAR-AT
-our $latex = eval {require Template::Plugin::Latex; 1;};
 
 
 # available printers
@@ -329,8 +473,6 @@ for ($cfg->Parameters('printers')){
 
 # Programs
 our $zip = $cfg->val('programs', 'zip', 'zip -r %dir %dir');
-our $gzip = $cfg->val('programs', 'gzip', "gzip -S .gz");
-
 
 
 # Whitelist for redirect destination / this isn't really configuration.
@@ -366,14 +508,15 @@ for (sort $cfg->Parameters('log4perl_config_modules_loglevel')){
 }
 # Log4perl configuration
 our $log4perl_config = qq(
-    log4perl.rootlogger = $LedgerSMB::Sysconfig::log_level, Basic, Debug
+    log4perl.rootlogger = $LedgerSMB::Sysconfig::log_level, Basic, Debug, DebugPanel
     )
     .
     $modules_loglevel_overrides
     .
-    qq(
+    q(
     log4perl.appender.Screen = Log::Log4perl::Appender::Screen
-    log4perl.appender.Screen.layout = SimpleLayout
+    log4perl.appender.Screen.layout = PatternLayout
+    log4perl.appender.Screen.layout.ConversionPattern = Req:%Z %p - %m%n
     # Filter for debug level
     log4perl.filter.MatchDebug = Log::Log4perl::Filter::LevelMatch
     log4perl.filter.MatchDebug.LevelToMatch = INFO
@@ -387,13 +530,13 @@ our $log4perl_config = qq(
     # layout for DEBUG,TRACE messages
     log4perl.appender.Debug = Log::Log4perl::Appender::Screen
     log4perl.appender.Debug.layout = PatternLayout
-    log4perl.appender.Debug.layout.ConversionPattern = %d - %p - %l -- %m%n
+    log4perl.appender.Debug.layout.ConversionPattern = Req:%Z %d - %p - %l -- %m%n
     log4perl.appender.Debug.Filter = MatchDebug
 
     # layout for non-DEBUG messages
     log4perl.appender.Basic = Log::Log4perl::Appender::Screen
     log4perl.appender.Basic.layout = PatternLayout
-    log4perl.appender.Basic.layout.ConversionPattern = %d - %p - %M -- %m%n
+    log4perl.appender.Basic.layout.ConversionPattern = Req:%Z %d - %p - %M -- %m%n
     log4perl.appender.Basic.Filter = MatchRest
 
     log4perl.appender.DebugPanel              = Log::Log4perl::Appender::TestBuffer
@@ -401,8 +544,9 @@ our $log4perl_config = qq(
     log4perl.appender.DebugPanel.mode         = append
     log4perl.appender.DebugPanel.layout       = PatternLayout
     log4perl.appender.DebugPanel.layout.ConversionPattern = %r >> %p >> %m >> %c >> at %F line %L%n
-    log4perl.appender.DebugPanel.Threshold = TRACE
-);
+    #log4perl.appender.DebugPanel.Threshold = TRACE
+
+    );
 #some examples of loglevel setting for modules
 #FATAL, ERROR, WARN, INFO, DEBUG, TRACE
 #log4perl.logger.LedgerSMB = DEBUG
@@ -413,57 +557,49 @@ our $log4perl_config = qq(
 #log4perl.logger.LedgerSMB.ScriptLib.Company=TRACE
 
 
-if(!(-d LedgerSMB::Sysconfig::tempdir())){
-     my $rc;
-     if ($Config{path_sep} eq ';'){ # We need an actual platform configuration variable
-         $rc = system("mkdir " . LedgerSMB::Sysconfig::tempdir());
-     } else {
-         $rc=system("mkdir -p " . LedgerSMB::Sysconfig::tempdir());
-     }
+# if you have latex installed set to 1
+our $latex = 0;
+
+
+sub override_defaults {
+
+    local $@ = undef; # protect existing $@
+
+    # Check Latex
+    $latex = eval {require Template::Plugin::Latex; 1;};
+
+    # Check availability and loadability
+    $LedgerSMB::Sysconfig::template_latex = (
+        $LedgerSMB::Sysconfig::template_latex ne 'disabled' &&
+        eval {require LedgerSMB::Template::LaTeX}
+    );
+    $LedgerSMB::Sysconfig::template_xls = (
+        $LedgerSMB::Sysconfig::template_xls ne 'disabled' &&
+        eval {require LedgerSMB::Template::XLS}
+    );
+    $LedgerSMB::Sysconfig::template_xlsx = (
+        $LedgerSMB::Sysconfig::template_xlsx ne 'disabled' &&
+        eval {require LedgerSMB::Template::XLSX}
+    );
+    $LedgerSMB::Sysconfig::template_ods = (
+        $LedgerSMB::Sysconfig::template_ods ne 'disabled' &&
+        eval {require LedgerSMB::Template::ODS}
+    );
+
+    return;
 }
 
-sub check_permissions {
-    use English qw(-no_match_vars);
+override_defaults;
 
-    if($EUID == 0){
-        die_pretty( "Running a Web Service as root is a security problem",
-                    "If you are starting LedgerSMB as a system service",
-                    "please make sure that you drop privlidges as per README.md",
-                    "and the example files in conf/",
-                    "This makes it difficult to run on a privlidged port (<1024)",
-                    "In theory you can pass the --user argument to starman,",
-                    "However starman drops privlidges too late, starting us as root."
-        )
-    }
+=head1 LICENSE AND COPYRIGHT
 
+Copyright (C) 2006-2018 The LedgerSMB Core Team
 
-    my $tempdir = LedgerSMB::Sysconfig::tempdir();
+This file is licensed under the Gnu General Public License version 2, or at your
+option any later version.  A copy of the license should have been included with
+your software.
 
-    if(!(-d "$tempdir")){
-        die_pretty( "$tempdir wasn't created.",
-                    "Does UID $EUID have access to $tempdir\'s parent?"
-        );
-    }
+=cut
 
-    if(!(-r "$tempdir")){
-        die_pretty(" $tempdir can't be read from.",
-                    "Does UID $EUID have read permission?"
-        );
-    }
-
-    if(!(-w "$tempdir")){
-        die_pretty( "$tempdir can't be written to.",
-                    "Does UID $EUID have write permission?"
-        );
-    }
-
-    if(!(-x "$tempdir")){
-        die_pretty( "$tempdir can't be listed.",
-                    "Does UID $EUID have execute permission?"
-        );
-    }
-}
-
-check_permissions;
 
 1;

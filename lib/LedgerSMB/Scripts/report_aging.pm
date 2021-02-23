@@ -1,8 +1,11 @@
+
+package LedgerSMB::Scripts::report_aging;
+
 =head1 NAME
 
 LedgerSMB::Scripts::report_aging - Aging Reports and Statements for LedgerSMB
 
-=head1 SYNOPSIS
+=head1 DESCRIPTION
 
 This module provides AR/AP aging reports and statements for LedgerSMB.
 
@@ -10,11 +13,9 @@ This module provides AR/AP aging reports and statements for LedgerSMB.
 
 =cut
 
-package LedgerSMB::Scripts::report_aging;
-
-use LedgerSMB;
 use LedgerSMB::Template;
 use LedgerSMB::Business_Unit;
+use LedgerSMB::Legacy_Util;
 use LedgerSMB::Report::Aging;
 use LedgerSMB::Scripts::reports;
 use LedgerSMB::Setting;
@@ -44,7 +45,7 @@ sub run_report{
     }
     my $report = LedgerSMB::Report::Aging->new(%$request);
     $report->run_report;
-    return $report->render_to_psgi($request);
+    return $report->render($request);
 }
 
 
@@ -76,7 +77,6 @@ sub generate_statement {
     my $rtype = $request->{report_type}; # in case we need it later
     $request->{report_type} = 'detail'; # needed to generate statement
 
-    my $template_suffix;
     my @statements;
     my $old_meta = $request->{meta_number};
 
@@ -127,34 +127,37 @@ sub generate_statement {
         #language => $language->{language_code}, #TODO
         format => uc $request->{print_format},
         method => $request->{media},
-        no_auto_output => 1,
+        output_options => {
+          filename => 'aging-report.' . lc($request->{print_format})
+        }
     );
     if ($request->{media} eq 'email'){
+
        #TODO -- mailer stuff
+       return;
+
     } elsif ($request->{media} eq 'screen'){
-        return $template->render_to_psgi({statements => \@statements},
-                  extra_headers => [
-                     'Content-Disposition' =>
-                           'attachment; filename="aging-report.'
-                                 . lc($request->{print_format}) . '"' ]);
+        return $template->render({statements => \@statements});
     } else {
-        $template->render({statements => \@statements});
+        LedgerSMB::Legacy_Util::render_template($template, {
+             statements => \@statements });
         $request->{module_name}='gl';
         $request->{report_type}='aging';
         return LedgerSMB::Scripts::reports::start_report($request);
     }
-
+    # Unreachable
 }
 
 sub _strip_specials {
     my $request = shift;
     delete $request->{$_} for (qw(buttons rows _DBH options locale));
     delete $request->{category} if (exists $request->{category} and $request->{category} eq 'X');
+    return;
 }
 
 =back
 
-=head1 COPYRIGHT
+=head1 LICENSE AND COPYRIGHT
 
 Copyright (C) 2012 The LedgerSMB Core Team.  This file may be re-used under the
 terms of te GNU General Public License version 2 or at your option any later

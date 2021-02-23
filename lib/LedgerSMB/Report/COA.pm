@@ -1,3 +1,6 @@
+
+package LedgerSMB::Report::COA;
+
 =head1 NAME
 
 LedgerSMB::Report::COA - Chart of Accounts List for LedgerSMB
@@ -24,8 +27,8 @@ Typically columns are displayed based on the permissions of the user.
 
 =cut
 
-package LedgerSMB::Report::COA;
 use Moose;
+use namespace::autoclean;
 extends 'LedgerSMB::Report';
 
 use LedgerSMB::App_State;
@@ -199,12 +202,12 @@ sub run_report{
         $r->{html_class} = 'listheading' if $r->{is_heading};
         $r->{link} =~ s/:/\n/g if $r->{link};
     }
-    $self->rows(\@rows);
+    return $self->rows(\@rows);
 }
 
 =back
 
-=head1 COPYRIGHT
+=head1 LICENSE AND COPYRIGHT
 
 COPYRIGHT (C) 2012 The LedgerSMB Core Team.  This file may be re-used following
 the terms of the GNU General Public License version 2 or at your option any

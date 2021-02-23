@@ -1,3 +1,6 @@
+
+package LedgerSMB::Report::File::Internal;
+
 =head1 NAME
 
 LedgerSMB::Report::File::Internal - Files for LSMB processes.
@@ -8,8 +11,8 @@ LedgerSMB::Report::File::Internal - Files for LSMB processes.
 
 =cut
 
-package LedgerSMB::Report::File::Internal;
 use Moose;
+use namespace::autoclean;
 extends 'LedgerSMB::Report';
 with 'LedgerSMB::Report::File', 'LedgerSMB::I18N';
 
@@ -40,7 +43,7 @@ sub columns {
      { col_id => 'file_name',
          type => 'href',
     href_base => 'file.pl?action=get&file_class=' . _set_file_class() .
-                 "&id=",
+                 '&id=',
   href_target => '_download',
          name => text('File Name'), },
      { col_id => 'description',
@@ -103,10 +106,10 @@ sub run_report {
     my ($self) = $_;
     my @rows = $self->list;
     $_->{row_id} = $_->{id} for @rows;
-    $self->rows(\@rows);
+    return $self->rows(\@rows);
 }
 
-=head1 COPYRIGHT
+=head1 LICENSE AND COPYRIGHT
 
 Copyright (C) 2014 The LedgerSMB Core Team
 

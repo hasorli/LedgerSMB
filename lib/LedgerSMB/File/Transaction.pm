@@ -1,12 +1,18 @@
-=pod
+
+package LedgerSMB::File::Transaction;
 
 =head1 NAME
 
 LedgerSMB::File::Transaction - Manages attachments to financial transactions.
 
-=head1 SYNOPSIS
+=head1 DESCRIPTION
 
 Manages attachments to financial transactions (in 1.3, AR, AP, and GL entries)
+
+Derived from C<LedgerSMB::File>, this module stores attachments in the
+C<file_transaction> table linked to the C<transactions> table (which
+itself is linked to the C<AR>, C<AP> and C<GL> tables).
+
 
 =head1 INHERITS
 
@@ -19,8 +25,8 @@ methods only
 
 =cut
 
-package LedgerSMB::File::Transaction;
 use Moose;
+use namespace::autoclean;
 extends 'LedgerSMB::File';
 
 =back
@@ -37,7 +43,7 @@ Attaches or links a specific file to the given transaction.
 
 sub attach {
     my ($self, $args) = @_;
-    $self->call_dbmethod(funcname => 'file__attach_to_tx');
+    return $self->call_dbmethod(funcname => 'file__attach_to_tx');
 }
 
 =item attach_all_from_order({id = int})
@@ -62,11 +68,12 @@ sub attach_all_from_order {
         $new_link->dbobject($self->dbobject);
         $new_link->attach;
     }
+    return;
 }
 
 =back
 
-=head1 COPYRIGHT
+=head1 LICENSE AND COPYRIGHT
 
 Copyright (C) 2011 The LedgerSMB Core Team
 
@@ -76,4 +83,5 @@ your software.
 
 =cut
 
+__PACKAGE__->meta->make_immutable;
 1;

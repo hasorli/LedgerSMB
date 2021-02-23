@@ -1,12 +1,16 @@
-=pod
+
+package LedgerSMB::File::Part;
 
 =head1 NAME
 
 LedgerSMB::File::Part - Manages attachments to goods and services.
 
-=head1 SYNOPSIS
+=head1 DESCRIPTION
 
 Manages attachments to goods and services.
+
+Derived from C<LedgerSMB::File>, stores its data in the C<file_part>
+table, linked to the C<part> table.
 
 =head1 INHERITS
 
@@ -21,8 +25,8 @@ methods only
 
 =cut
 
-package LedgerSMB::File::Part;
 use Moose;
+use namespace::autoclean;
 extends 'LedgerSMB::File';
 
 =head1 METHODS
@@ -37,12 +41,12 @@ Attaches or links a specific file to the given transaction.
 
 sub attach {
     my ($self, $args) = @_;
-    $self->call_dbmethod(funcname => 'file__attach_to_part');
+    return $self->call_dbmethod(funcname => 'file__attach_to_part');
 }
 
 =back
 
-=head1 COPYRIGHT
+=head1 LICENSE AND COPYRIGHT
 
 Copyright (C) 2011 The LedgerSMB Core Team
 
@@ -52,4 +56,5 @@ your software.
 
 =cut
 
+__PACKAGE__->meta->make_immutable;
 1;

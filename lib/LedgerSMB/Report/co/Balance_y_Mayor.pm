@@ -1,3 +1,6 @@
+
+package LedgerSMB::Report::co::Balance_y_Mayor;
+
 =head1 NAME
 
 LedgerSMB::Report::co::Balance_y_Mayor - Colombian Balance/Ledger Rpt
@@ -23,8 +26,8 @@ standards. This report shows total activity over a time period.
 
 =cut
 
-package LedgerSMB::Report::co::Balance_y_Mayor;
 use Moose;
+use namespace::autoclean;
 use LedgerSMB::MooseTypes;
 extends 'LedgerSMB::Report';
 
@@ -96,6 +99,7 @@ sub columns {
      pwidth => '3', },
 
     );
+    return @COLS;
 }
 
 
@@ -116,7 +120,8 @@ Returns the localized template name
 =cut
 
 sub name {
-    return LedgerSMB::Report::text('Balance y Mayor');
+    # Do not translate; it's the colombian name of a localized report
+    return 'Balance y Mayor';
 }
 
 =item header_lines
@@ -171,12 +176,12 @@ Runs the report, and assigns rows to $self->rows.
 sub run_report{
     my ($self) = @_;
     my @rows = $self->call_dbmethod(funcname => 'report__general_balance');
-    $self->rows(\@rows);
+    return $self->rows(\@rows);
 }
 
 =back
 
-=head1 COPYRIGHT
+=head1 LICENSE AND COPYRIGHT
 
 COPYRIGHT (C) 2012 The LedgerSMB Core Team.  This file may be re-used following
 the terms of the GNU General Public License version 2 or at your option any

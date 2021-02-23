@@ -1,13 +1,18 @@
-=pod
+
+package LedgerSMB::File::Order;
 
 =head1 NAME
 
 LedgerSMB::File::Order - Manages attachments to orders.
 
-=head1 SYNOPSIS
+=head1 DESCRIPTION
 
-Manages attachments to orders (sales orders, purchase orders, quotations and
-RFQ's).
+Manages attachments to orders (sales orders, purchase orders,
+quotations and RFQ's).
+
+Derived from C<LedgerSMB::File>, this module stores files in the
+C<file_order> table with links to the C<oe> table storing orders
+and quotations.
 
 =head1 INHERITS
 
@@ -22,9 +27,9 @@ methods only
 
 =cut
 
-package LedgerSMB::File::Order;
 use strict;
 use Moose;
+use namespace::autoclean;
 extends 'LedgerSMB::File';
 
 =head1 METHODS
@@ -39,7 +44,7 @@ Attaches or links a specific file to the given transaction.
 
 sub attach {
     my ($self, $args) = @_;
-    $self->call_dbmethod(funcname => 'file__attach_to_order');
+    return $self->call_dbmethod(funcname => 'file__attach_to_order');
 }
 
 =item attach_all_from_order({id = int})
@@ -64,6 +69,7 @@ sub attach_all_from_order {
         $new_link->dbobject($self->dbobject);
         $new_link->attach;
     }
+    return;
 }
 
 =item attach_all_from_transaction({id = int})
@@ -89,11 +95,12 @@ sub attach_all_from_transaction {
         $new_link->dbobject($self->dbobject);
         $new_link->attach;
     }
+    return;
 }
 
 =back
 
-=head1 COPYRIGHT
+=head1 LICENSE AND COPYRIGHT
 
 Copyright (C) 2011 The LedgerSMB Core Team
 
@@ -103,4 +110,5 @@ your software.
 
 =cut
 
+__PACKAGE__->meta->make_immutable;
 1;

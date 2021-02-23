@@ -1,3 +1,6 @@
+
+package LedgerSMB::Report::Listings::Overpayments;
+
 =head1 NAME
 
 LedgerSMB::Report::Listings::Overpayments - Overpayments Search Results for
@@ -9,8 +12,8 @@ LedgerSMB
 
 =cut
 
-package LedgerSMB::Report::Listings::Overpayments;
 use Moose;
+use namespace::autoclean;
 extends 'LedgerSMB::Report';
 with 'LedgerSMB::Report::Dates';
 
@@ -178,10 +181,10 @@ sub run_report {
     for my $r (@rows){
        $r->{row_id} = $r->{payment_id};
     }
-    $self->rows(\@rows);
+    return $self->rows(\@rows);
 }
 
-=head1 COPYRIGHT
+=head1 LICENSE AND COPYRIGHT
 
 COPYRIGHT(C) 2013 The LedgerSMB Core Team.  This file may be reused under the terms
 of the GNU General Public License, versin 2 or at your option any later version.

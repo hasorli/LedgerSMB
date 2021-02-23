@@ -1,14 +1,23 @@
+
+package LedgerSMB::Scripts::transtemplate;
+
 =head1 NAME
 
 LedgerSMB::Scripts::transtemplate - Transaction Template Workflows for LedgerSMB
+
+=head1 DESCRIPTION
+
+Entry points for managing transaction templates.
 
 =head1 SYNPOSIS
 
  LedgerSMB::Scripts::transtemplate::view($request);
 
-=cut
+=head1 METHODS
 
-package LedgerSMB::Scripts::transtemplate;
+This module doesn't specify any methods.
+
+=cut
 
 use strict;
 use warnings;
@@ -37,7 +46,7 @@ sub _run_update {
     convert_to_form($transtemplate, $lsmb_legacy::form, $journal_type);
     $lsmb_legacy::form->{title} = 'Add';
 
-    lsmb_legacy::update();
+    return lsmb_legacy::update();
 }
 
 sub view {
@@ -75,7 +84,7 @@ sub convert_to_form{
     my ($trans, $form, $type) = @_;
     my %myconfig;
     $form->{session_id} = $trans->{session_id};
-    if ($type eq 1){
+    if ($type == 1){
         $form->{reference} = $trans->{reference};
         $form->{description} = $trans->{description};
         $form->{rowcount} = 0;
@@ -96,7 +105,7 @@ sub convert_to_form{
     } else { #ar or ap
         my $meta_number = $trans->{credit_data}->{meta_number};
         $form->{reverse} = 0;
-        if ($type eq 2){
+        if ($type == 2){
             $form->{customer} = $meta_number;
         } else {
             $form->{vendor} = $meta_number;
@@ -106,7 +115,7 @@ sub convert_to_form{
             $form->{"amount_$form->{rowcount}"} = $row->{amount};
         }
     }
-    delete $form->{id};
+    return delete $form->{id};
 }
 
 =item list
@@ -118,7 +127,7 @@ Lists all transaction templates
 sub list {
     my ($request) = @_;
     return LedgerSMB::Report::Listings::TemplateTrans->new(%$request)
-        ->render_to_psgi($request);
+        ->render($request);
 }
 
 =item delete
@@ -137,12 +146,12 @@ sub delete {
         delete $request->{"row_select_$row"};
     }
     return LedgerSMB::Report::Listings::TemplateTrans->new(%$request)
-        ->render_to_psgi($request);
+        ->render($request);
 }
 
 =back
 
-=head1 COPYRIGHT
+=head1 LICENSE AND COPYRIGHT
 
 COPYRIGHT (C) 2012 The LedgerSMB Core Team.  This file may be re-used under the
 terms of the LedgerSMB General Public License version 2 or at your option any

@@ -558,6 +558,20 @@ CREATE TABLE users (
     entity_id int not null references entity(id) on delete cascade
 );
 
+COMMENT ON TABLE users IS
+$$ This table maps lsmb entities to postgresql roles, which are used to
+authenticate lsmb users. The username field maps to the postgresql role name
+and is therefore subject to its limitations.
+
+A role name is considered an Identifier and as such must begin with
+a letter or an underscore and is limited by default to 63 bytes (could be
+fewer characters if unicode) as documented here:
+https://www.postgresql.org/docs/current/static/sql-syntax-lexical.html#SQL-SYNTAX-IDENTIFIERS
+
+Lsmb restricts the length of username, but this is an arbitrary restriction
+beyond the postgresql role name limitations already described.
+$$;
+
 -- Session tracking table
 
 CREATE TABLE session(
@@ -1347,7 +1361,7 @@ sinumber|1
 sonumber|1
 yearend|1
 businessnumber|1
-version|1.6.0-dev
+version|1.7.0-dev
 closedto|\N
 revtrans|1
 ponumber|1
@@ -1634,19 +1648,6 @@ invoices.$$;
 
 COMMENT ON COLUMN journal_note.internal_only IS
 $$ When set to true, does not show up in notes list for invoice templates$$;
--- THe following credit accounts are used for inventory adjustments.
-INSERT INTO entity (id, name, entity_class, control_code,country_id)
-values (0, 'Inventory Entity', 1, 'AUTO-01','232');
-
-INSERT INTO company (legal_name, entity_id)
-values ('Inventory Entity', 0);
-
-INSERT INTO entity_credit_account (entity_id, meta_number, entity_class)
-VALUES
-(0, '00000', 1);
-INSERT INTO entity_credit_account (entity_id, meta_number, entity_class)
-VALUES
-(0, '00000', 2);
 
 
 --
@@ -1761,7 +1762,6 @@ for payment or in outstanding reports.$$;
 
 --
 --TODO 1.6 ap invnumber text check (invnumber ~ '[[:alnum:]_]') NOT NULL
---TODO 1.6 ap paid,datepaid , drop those fields? they are not maintained in Payment.sql!
 CREATE TABLE ap (
   id int DEFAULT nextval ( 'id' ) PRIMARY KEY REFERENCES transactions(id),
   invnumber text,
@@ -3755,16 +3755,20 @@ insert the relevant lines into asset_report_line. $$;
 comment on column asset_dep_method.method IS
 $$ These are keyed to specific stored procedures.  Currently only "straight_line" is supported$$;
 
-INSERT INTO asset_dep_method(method, unit_class, sproc, unit_label, short_name)
-values ('Annual Straight Line Daily', 1, 'asset_dep_straight_line_yr_d', 'in years', 'SLYD');
-
-
-INSERT INTO asset_dep_method(method, unit_class, sproc, unit_label, short_name)
-values ('Whole Month Straight Line', 1, 'asset_dep_straight_line_whl_m',
-'in months', 'SLMM');
-
-INSERT INTO asset_dep_method(method, unit_class, sproc, unit_label, short_name)
-values ('Annual Straight Line Monthly', 1, 'asset_dep_straight_line_yr_m', 'in years', 'SLYM');
+INSERT INTO asset_dep_method
+  (method, unit_class,
+   sproc,
+   unit_label, short_name)
+values
+  ('Annual Straight Line Daily', 1,
+   'asset_dep_straight_line_yr_d',
+   'in years', 'SLYD'),
+  ('Whole Month Straight Line', 1,
+   'asset_dep_straight_line_month',
+   'in months', 'SLMM'),
+  ('Annual Straight Line Monthly', 1,
+   'asset_dep_straight_line_yr_m',
+   'in years', 'SLYM');
 
 CREATE TABLE asset_class (
         id serial not null unique,

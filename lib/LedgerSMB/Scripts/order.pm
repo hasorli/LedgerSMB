@@ -1,3 +1,6 @@
+
+package LedgerSMB::Scripts::order;
+
 =head1 NAME
 
 LedgerSMB::Scripts::order - Order search functions for LedgerSMB
@@ -13,15 +16,18 @@ shipping or receiving, merging several orders into one, or the like.
 
 =cut
 
-package LedgerSMB::Scripts::order;
-
 use strict;
 use warnings;
 
 use LedgerSMB::Scripts::reports;
 use LedgerSMB::Report::Orders;
+use LedgerSMB::Magic qw( OEC_PURCHASE_ORDER OEC_SALES_ORDER OEC_QUOTATION OEC_RFQ );
 
 use LedgerSMB::old_code qw(dispatch);
+
+=head1 METHODS
+
+This module doesn't specify any methods.
 
 =head1 ROUTINES
 
@@ -52,7 +58,7 @@ sub get_criteria {
     $request->{entity_class} = $request->{oe_class_id} % 2 + 1;
     $request->{report_name} = 'orders';
     $request->{open} = 1 if $request->{search_type} ne 'search';
-    if ($request->{oe_class_id} == 1){
+    if ($request->{oe_class_id} == OEC_SALES_ORDER ){
         if ($request->{search_type} eq 'search'){
             $request->{title} = $locale->text('Search Sales Orders');
         } elsif ($request->{search_type} eq 'generate'){
@@ -63,7 +69,7 @@ sub get_criteria {
         } elsif ($request->{search_type} eq 'ship'){
             $request->{title} = $locale->text('Ship');
         }
-    } elsif ($request->{oe_class_id} == 2){
+    } elsif ($request->{oe_class_id} == OEC_PURCHASE_ORDER ){
         if ($request->{search_type} eq 'search'){
             $request->{title} = $locale->text('Search Purchase Orders');
         } elsif ($request->{search_type} eq 'combine'){
@@ -74,11 +80,11 @@ sub get_criteria {
         } elsif ($request->{search_type} eq 'ship'){
             $request->{title} = $locale->text('Receive');
         }
-    } elsif ($request->{oe_class_id} == 3){
+    } elsif ($request->{oe_class_id} == OEC_QUOTATION ){
         if ($request->{search_type} eq 'search'){
             $request->{title} = $locale->text('Search Quotations');
         }
-    } elsif ($request->{oe_class_id} == 4){
+    } elsif ($request->{oe_class_id} == OEC_RFQ ){
         if ($request->{search_type} eq 'search'){
             $request->{title} = $locale->text('Search Requests for Quotation');
         }
@@ -122,7 +128,7 @@ sub search {
            value => 'generate',
         }]);
     }
-    return $report->render_to_psgi($request);
+    return $report->render($request);
 }
 
 =item combine
@@ -158,7 +164,7 @@ sub generate {
 
 =back
 
-=head1 COPYRIGHT
+=head1 LICENSE AND COPYRIGHT
 
 COPYRIGHT (C) 2012 The LedgerSMB Core Team.  This file may be re-used under the
 terms of the LedgerSMB General Public License version 2 or at your option any

@@ -1,3 +1,6 @@
+
+package LedgerSMB::Report::Taxform::List;
+
 =head1 NAME
 
 LedgerSMB::Report::Taxform::List - A list of tax forms defined in LedgerSMB
@@ -15,8 +18,8 @@ This is a simple list of tax forms.
 
 =cut
 
-package LedgerSMB::Report::Taxform::List;
 use Moose;
+use namespace::autoclean;
 extends 'LedgerSMB::Report';
 
 =head1 CRITERIA PROPERTIES
@@ -99,10 +102,10 @@ sub run_report {
                                      ? LedgerSMB::Report::text('Yes')
                                      : LedgerSMB::Report::text('No');
     }
-    $self->rows(\@rows);
+    return $self->rows(\@rows);
 }
 
-=head1 COPYRIGHT
+=head1 LICENSE AND COPYRIGHT
 
 Copyright(C) 2013 The LedgerSMB Core Team
 

@@ -1,3 +1,6 @@
+
+package LedgerSMB::X12;
+
 =head1 NAME
 
 LedgerSMB::X12 - Base Class for LedgerSMB X12 handling
@@ -27,13 +30,14 @@ supported by X12::Parser.
 
 =cut
 
-package LedgerSMB::X12;
 use Moose;
+use namespace::autoclean;
 use X12::Parser;
-use LedgerSMB::Sysconfig;
+use LedgerSMB::Magic qw( EDI_PATHNAME_MAX );
 use DateTime;
+use File::Temp;
 
-my $counter = 1000; #for 997 generation
+my $counter = 1000; #for 997 generation  ## no critic (ProhibitMagicNumbers) sniff
 my $dt = DateTime->now;
 my $date = sprintf('%04d%02d%02d', $dt->year, $dt->month, $dt->day);
 my $time = sprintf('%02d%02d', $dt->hour, $dt->min);
@@ -101,18 +105,14 @@ sub _ISA {
     my ($self) = @_;
     my @segments = $self->parser->get_loop_segments;
     @segments = $self->parser->get_loop_segments unless @segments;
-    if ($segments[0] != 'ISA'){
+    if ($segments[0] ne 'ISA'){
         $self->parse;  # re-initialize parser, we don't have an ISA!
         die 'No ISA'; # Trappable error.
     }
 
     my $isa = {};
 
-    my @keys;
-
-    push @keys, sprintf('ISA%02d', $_) for (1 .. 16);
-
-    for my $key (@keys){
+    for my $key ( 'ISA01' .. 'ISA16' ){
        $isa->{$key} = shift @segments;
     }
     return $isa;
@@ -134,7 +134,7 @@ sub is_message_file {
     my ($self) = @_;
     return $self->read_file if $self->has_read_file;
 
-    if (length($self->message) > 180
+    if (length($self->message) > EDI_PATHNAME_MAX
         or ($self->message !~ /\.\w{3}$/ and $self->message !~ /\//)
     ){
        return 0;
@@ -151,7 +151,7 @@ $self->parser.
 
 sub _parser {
     my ($self) = @_;
-    my $parser = new X12::Parser;
+    my $parser = X12::Parser->new;
     my $file = $self->message;
     return $parser;
 }
@@ -161,15 +161,17 @@ sub parse {
     my $file;
     my $parser = $self->parser;
     if (!$self->is_message_file){
-        $file = $LedgerSMB::Sysconfig::tempdir . '/' . $$ . '-' . $self->message;
-        open TMPFILE, '>', $file;
-        print TMPFILE $self->message;
-        close TMPFILE;
-    } else {
+        $file = File::Temp->new();
+        print $file $self->message or die "Cannot print to file $file";;
+        close $file or die "Cannot close file $file";;
+    }
+    else {
         $file = $self->message;
     }
-    $parser->parsefile( file => $file,
-                        conf => $self->config_file);
+    $parser->parsefile(
+        file => $file,
+        conf => $self->config_file
+    );
     return $parser;
 }
 
@@ -187,7 +189,7 @@ In these cases one needs to set it manually.  Use this function to do this.
 sub set_segment_sep {
     my ($self, $sep) = @_;
     # ick, ai don't like how this involves messing around with internals.
-    $self->parser->{_SEGMENT_SEPARATOR} = $sep;
+    return $self->parser->{_SEGMENT_SEPARATOR} = $sep;
 }
 
 =item write_997($form, $success)
@@ -198,11 +200,12 @@ Returns the test of a 997 document from the current document.
 
 sub write_997{
     my ($self, $form, $success) = @_;
-     my $status;
-    if ($success){
-       $status = 'A';
-    } else {
-       $status = 'R';
+    my $status;
+    if ($success) {
+        $status = 'A';
+    }
+    else {
+        $status = 'R';
     }
     my $sep = $self->parser->get_element_separator;
     my $seg = $self->parser->{_SEGMENT_SEPARATOR};
@@ -220,7 +223,7 @@ sub write_997{
 
 =back
 
-=head1 COPYRIGHT
+=head1 LICENSE AND COPYRIGHT
 
 Copyright (C) 2013 The LedgerSMB Core Team.  This file may be re-used under the
 terms of the GNU General Public License version 2 or at your option any later

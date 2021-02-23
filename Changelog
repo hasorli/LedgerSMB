@@ -1,30 +1,367 @@
                                                         -*- fundamental -*-
-Changelog for 1.6 Series
+Changelog for 1.7 Series
 Forthcoming
 
+
+
+Changelog for 1.6 Series
+Released 2018-06-10
+
+Changelog for 1.6.2
+* Print button (to screen) doesn't work more than once (Erik H, #3705)
+* Menu links ignore clicks long after first click (Erik H, #3704)
+
+Erik H is Erik Huelsmann
+
+
+Changelog for 1.6.1
+* Menu fails to show sometimes (Erik H, #3684)
+* Error when managing user permissions through HR screen (Erik H, #3686)
+* Reconciliation reports sometimes can't be submitted (Nick P)
+
+Erik H is Erik Huelsmann
+Nick P is Nick Prater
+
+
+Changelog for 1.6.0
+
+User Interface
+* Reports and search results exportable to XLS(X) (Yves L)
+* Left menu replaced by a (faster) Dojo-based version (Yves L/Erik H)
+
+Installation & Administration
+* Added 'System Information' page to setup.pl for problem diagnosis (Erik H)
+* Numerous improvements for the migrations and infrastructure (Yves L/Erik H)
+* Better detection of incorrect @INC paths (David G)
+* Automatic date format selection using browser locale (Yves L/Erik H)
+* No more warnings from database creation and upgrade (Erik H)
+* Improved logging: various logs correlated using unique request IDs (Erik H)
+* Functions 'warn()' and 'die()' logged to debug logs (Erik H)
+* Removed need for 'tempdir' and associated configuration option (Nick P)
+* Removed numerous unused configuration options (Nick P)
+* Specific output formats can be disabled in configuration (Yves L)
+* Respect smtpuser and smtppass configuration options (Nick P)
+* Add smtpport configuration option (Nick P)
+* Database upgrades now ask for user input on (expected) faulty data (Erik H)
+
 Performance
-* Remove CGI::Emulate::PSGI wrapper for 'new code' (Erik H/Yves L)
+* PSGI responses no longer written to file but kept in memory (Erik H/Yves L)
+
+Rewritten inventory tracking and adjustments
+* Removed the need for the ill-understood 'Inventory Entity' (Erik H)
+* Inventory adjustments GL transactions instead of dummy invoices (Erik H)
+* SQL & in-browser(BDD) tests (Erik H)
 
 Code cleanup
 * Removed code duplication in
   - Template handling framework (Yves L)
+* Remove unused variables and unreachable code (Nick P)
+* Remove fragments of REST framework never fully implemented (Erik H)
+* Authentication handling centralized in request dispatch code (Erik H)
+* Cleaned up handling of uploaded files in request handling (Erik H)
+* Moved to Plack::Request (from CGI::Simple & LedgerSMB) (Erik H)
+* Template format plugin cleanup and refactoring (Erik H/Nick P)
+* Template handling code cleanup (Erik H/Nick P)
+* Unreferenced UI templates deleted (Erik H)
+* Centralized and more robust entry point for code in old/ (Erik H)
+* Merge of SQL-Ledger 2.8 and 3.0 migration code; improved consistency (Yves L)
+* Improved cleanup of temp files and dirs after use (Erik H)
+* Improved HTML structure (balanced closing/opening tags, etc) (Yves L)
+* Factored HTTP response responsibility out of LedgerSMB::Template (Erik H)
+* Moved request pre- and post-processing into custom Plack Middlewares (Erik H)
 
 Quality assurance
 * Port testing of database routines to pgTAP (and Perl's 'prove') (Yves L)
+* Enforce numerous Perl::Critic policies with code cleanup (Nick P/Rob R)
+* Add tests for all template output formats (Nick P)
+* Constrain password_duration setting to valid values (Nick P)
+
+Erik H is Erik Huelsmann
+Yves L is Yves Lavoie
+Nick P is Nick Prater
+Rob R is Rob Ransbottom
+David G is David Godfrey
+
+
+Changelog for 1.5 Series
+Released 2016-12-24
+
+Changelog for 1.5.21
+* Clarify message after changing password through Preferences (Nick P)
+* Fix errors in ODS report tepmlate's title page (Nick P)
+* Fix #3642: Taxform report generation failing (Erik H)
+* Detect BOM to determine UTF-8 CSV imports (Erik H)
+
+Nick P is Nick Prater
+Erik H is Erik Huelsmann
+
+
+
+Changelog for 1.5.20
+* Fix inability to save custom sequences (System > Sequence) (Erik H, #3511)
+* Fix error when downloading balance sheet as PDF (Erik H, #3515)
+* Fix empty backup file due to PGObject::Util::DBAdmin 0.120 (Erik H, #3531)
+* Norwegian (nb) translation update (Havard S)
+
+Erik H is Erik Huelsmann
+Havard S is Havard Sorli
+
+
+Changelog for 1.5.19
+* Fix payment screen localized amount formatting problem (Erik H, #3283)
+* Separate error and output 'psql' logs during database upgrade (Nick P)
+* Fix random order of PNL and B/S reports columns (Erik H, #2244)
+* Various fixes to setup.pl regarding backup file generation (Nick P)
+* Use File::Path to create directory instead of through shell call-out (Nick P)
+* On TAB-exit of accounts/parts selector, select first item (Erik H)
+* Estonian translation update (Margus L)
+* German translation update (Mikael A)
+* Hungarian translation update (Istvan P)
+
+Erik H is Erik Huelsmann
+Nick P is Nick Prater
+Istvan P is is Istvan Pongracz
+Margus L is Margus Lepmets
+Mikael A is Mikael Arhelger
+
+
+Changelog for 1.5.18
+* Fix menu-resizing minimum threshold overlapping main content (Erik H, #3421)
+* Persist selected menu-width across sessions/page reloads (Erik H)
+* Fix customer pricelist Quantity field not saved for new rows (Erik H)
+* Fix quantity discounts not working on orders/quotations (Erik H, #3439)
+* Customer pricelist changes can be saved without adding new rows (Erik H)
+* Field 'PO Number' on purchase documents renamed to 'SO Number' (Erik H, #3276)
+* (Running) 'Balance' column of 'Search & GL' report incorrect (Erik H)
+* German translation update (Mikael A)
+* Estonian translation update (Margus L)
+
+Erik H is Erik Huelsmann
+Margus L is Margus Lepmets
+Mikael A is Mikael Arhelger
+
+
+Changelog for 1.5.17
+* Fix inability to add taxforms (Erik H, #3431)
+* Add loading of SIC and GIFI on company creation to setup.pl (Erik H, #3442)
+* Fix double counted 'paid' amount on some printed invoices (Erik H, #3440)
+* Fix failure to include 'Price Updated' column on goods search (Erik H, #3333)
+* Fix payment account on invoice to retain value on update (Erik H, #3455)
+* Fix linebreaks, '<' and '>' showing as HTML code on invoice (Erik H, #3457)
+* Estonian translation update (Margus L)
+* German translation update (Mikael A)
+
+Erik H is Erik Huelsmann
+Margus L is Margus Lepmets
+Mikael A is Mikael Arhelger
+
+
+Changelog for 1.5.16
+* Properly compute the last cleared balance on reconciliation (Yves L, #3405)
+* Fix regression reports not showing (PDF, etc) download links (Erik H, #3408)
+* Fix typo in SQL Ledger upgrade code (Erik H, #3409)
+* Add French Chart of Accounts (Yves L)
+* Lift requirement to enter sensitive private data when creating users (Erik H)
+* Fix absolute [New] link on order, AR and AP pages (Erik H)
+* Support non-root hosting by using relative '/' to 'login.pl' redirect (Erik H)
 
 Erik H is Erik Huelsmann
 Yves L is Yves Lavoie
 
 
-Changelog for 1.5 Series
-Released 2016-12-24
+Changelog for 1.5.15
+* Generate access logs on standard output by default (Erik H)
+* Fix cli scripts; block running as root in PSGI instead of Sysconfig (Erik H)
+* Remove our moving out of SourceForge notice from the welcome page (Erik H)
+* Fix zero-value depreciations from blocking later depreciations (Chris T)
+* Be explicit about which Perl::Critic policies to apply in tests (Nick P)
+* Check for file errors when blacklist test (Nick P)
+* Make checks work (out of the box) with our Docker dev images (Nick P)
+
+Chris T is Chris Travers
+Erik H is Erik Huelsmann
+Nick P is Nick Prater
+
+
+Changelog for 1.5.14
+* Post (instead of save) transaction on depreciation approval (Erik H)
+* Fix role prefix set on copied databases from setup.pl (Erik H, #3219)
+* Fix argument names due to move to PGObject::Util::DBAdmin (Erik H)
+* Fix posting of vendor invoice fails with vendor-price in parts (Erik H, #3081)
+* Fix example Apache config file's SSLRequireSSL directive (Erik H, #3272)
+* Fix invoice shows fewer $decimalplaces than configured (Erik H, #3271)
+* Fix upgrade code using db transactions incorrectly (Erik H, #3289)
+* Improve 'in progress' feedback by fading submitted content (Erik H, #3283)
+* Add visual feedback to form input validation in setup.pl (Erik H)
+* Implement checks for correct loading of sql/modules/ files (Erik H)
+* Correct Roles.sql and PriceMatrix.sql loading errors (Erik H)
+* Fix 'uninitialized variable' warnings on database creation (Erik H, #3266)
+* Find part number on invoice/order by substring; was prefix (Erik H, #3266)
+* Find part description on invoice/order by substring; was 'full text' (Erik H)
+* Change part search on invoice/order to be case insensitive (Erik H, #3266)
+
+Erik H is Erik Huelsmann
+
+
+Changelog for 1.5.13
+* Fix setup.pl showing [_1] instead of the LedgerSMB version (Erik H)
+* Fix contacts with attachments being inaccessible (Erik H, #3228)
+* Fix AR/AP Aging report failing to be generated (Erik H, #3243)
+* Upgrade Dojo from 1.10.8 to 1.10.9 (Erik H)
+* Fix HTML aging statement download not popping up 'Save' dialog (Erik H)
+* Fix date format 'dd/mm/yyyy' being parsed incorrectly (Erik H, #3223)
+
+Erik H is Erik Huelsmann
+
+
+Changelog for 1.5.12
+* Fix depreciation method listing incorrect stored procedure (Erik H)
+* Fix failure to select business type details from business list (Erik H, #3154)
+* Require fixed asset values needed in depreciation to be entered (Erik H)
+* Fix the Net Book Value report listing assets by the wrong class (Erik H)
+* Fix the Net Book Value report incorrectly excluding some assets (Erik H)
+* Fix Ship To screen reporting server error and staying blank (Erik H, #2516)
+* Fix non-existing entry-point error on 'Approve' in fixed assets (Erik H)
+* Fix errors due to double 'action' field in fixed assets reports (Erik H)
+* Fix disposal-specific fields appearing in depreciation screens (Erik H)
+* Fix Parts Group drop-down and column selector in Goods Search (Erik H, #1581)
+* Require proceeds on disposal prevents NULL amounts on approval (Erik H)
+
+Erik H is Erik Huelsmann
+
+
+Changelog for 1.5.11
+* Rename lighttpd example configuration file for consistency (Yves L)
+* Fix Net Book Value report shows 'LedgerSMB::Report' as its name (Erik H, #3132)
+* Fix Depreciation screen not showing any assets (Erik H, #3131)
+* Fix fixed asset's 'Usable life' field not showing entered value (Erik H, #3130)
+* Fix Net Book Value report's link to asset details broken (Erik H, #3129)
+* Ensure forked sub-processes to be correctly terminated (Erik H)
+* Fix Form submission sometimes seems to hang (Erik H, #2972)
+* Fix missing content in columns of the outstanding report (Erik H, #2585)
+* Fix contacts search ignores e-mail and phone filters (Erik H, #2821)
+* Fix contacts search by address data doesn't work (Erik H, #2490)
+
+Yves L is Yves Lavoie
+Erik H is Erik Huelsmann
+
+
+Changelog for 1.5.10
+* Fix loading image URL taken from Dojo 1.12 (instead of 1.10) (Erik H)
+* Fix mails being sent with non-unique Message-IDs (Erik H, #3041)
+* Round-trip fewer values over web requests during migration (Erik H)
+* Migrate accounting <-> invoice relationship from LSMB 1.2/SL (Erik H/Yves L)
+* Fix 500 ISE on bottom of order when creating from vendor (Erik H, #3057)
+* Contact info now properly HTML-escaped (Erik H, #2820)
+* Add check for cr_coa_to_account primary key to 1.3 migration (Erik H, #2663)
+* Add work-around to PGOld for PGObject::Simple 2.x incompatibility (Chris T)
+* Fix missing asset classes on Depreciate and Disposal screens (Erik H, #3123)
+
+Erik H is Erik Huelsmann
+Yves L is Yves Lavoie
+Chris T is Chris Travers
+
+
+Changelog for 1.5.9
+* Fix goods/services search with AR/AP invoices (Chris T, #2938)
+* Fix inventory activity report drill down over-inclusive (Chris T, #2926)
+* Fix Ship/Receive column alignments (Chris T)
+* Fix mailing recurring invoices shows invoice in-screen (Erik H, #3004)
+* Fix missing column SQL error when posting recurring invoices (Erik H)
+* Show an error when page assets (Dojo) are missing (Erik H)
+* Fix new welcome page being referred to by absolute path (Erik H, #2994)
+* Fix 'Not an ARRAY reference' error in recurring AP processing (Erik H, #2973)
+* Fix recurring AP invoices posted but 'next date' unchanged (Erik H, #3019)
+* Fix the fix for '.' missing in @INC (Erik H)
+* Add lighttpd example config (Yves L)
+* Fix regression in setup.pl with LedgerSMB 1.2 or SQL Ledger db (Yves L)
+* Fix error when adding customer-specific price to customer (Erik H, #2643)
+* Fix can't edit sales & purchase quotation through web UI (Erik H, #2617)
+* Fix string match operator typo in company searches (Erik H)
+* Fix LedgerSMB 1.2->1.5 migration script syntax errors (Erik H)
+* Add migration non-standard (gl) 'account links' for 1.2->1.5 (Erik H)
+* When including code with 'do', don't silently skip errors (David G, #3020)
+
+Chris T is Chris Travers
+Erik H is Erik Huelsmann
+Yves L is Yves Lavoie
+David G is David Godfrey
+
+
+Changelog for 1.5.8
+* Fix printing of AR/AP transactions results in JavaScript error (Erik H)
+* Fix ODS output appearing on 'Title page' instead of 'Search results' (Erik H)
+* Fix Edit Vendor address misses 'Save' button (Erik H, #2709)
+* Fix Recurring Transactions screen fails on second access (Erik H, #2888)
+* Fix 'On Hand' goods search filter not being applied (Erik H, #2845)
+* Clean up issues found by Debian's 'lintian' (Erik H, Robert C)
+* Fix layout regression of 1.5 in single payment screen (Erik H, #1917)
+* Fix 'Update' on Assembly page resetting BOM count to 1 (Erik H, 2835)
+* Fix 'Update' on Assembly page requiring all BOM lines filled (Erik H, 2835)
+* New 'Welcome' screen after login, helping people find help (Erik H)
+* Updated Indonesian translation (LedgerSMB Transifex Indonesian group)
+
+Erik H is Erik Huelsmann
+Robert C is Robert James Clay
+
+
+Changelog for 1.5.7
+* Fix missing trailing zeros in cheque printing (Erik H, #2565)
+* Change comparison periods selector to a number spinner (Erik H)
+* Fix http error response (Yves L)
+* Fix Salesperson field not displayed (Nick P, #2784)
+* Fix can't delete unused account after books closed (Nick P, #2800)
+* Fix Contact search on address broken (Nick P, #2490)
+* Fix parts with capitals can't be added to AP invoices (Erik H)
+* Change 'Super-user login' to 'Database admin login' (Erik H, #2654)
+* Fix reconciliation loads parser from non-existing location (Erik H, #2313)
+* Clarify 'Import (Yes/No)' on user creation (Erik H, #1510)
+* Fix left menu initially too narrow (Erik H, #955)
+
+Erik H is Erik Huelsmann
+Yves L is Yves Lavoie
+Nick P is Nick Prater
+
+
+Changelog for 1.5.6
+* Fix syntax error in LaTeX templates for printed documents (Erik H)
+* Refactor filter pages for income statement and balance sheet (Erik H)
+* Fix reversal of payments against non-eca-default AR/AP account (Erik H, #2558)
+
+Erik H is Erik Huelsmann
+
+
+Changelog for 1.5.5
+* Fix name of the sequence being updated in the 1.3 migration script (Erik H)
+
+Erik H is Erik Huelsmann
+
+
+Changelog for 1.5.4
+* Updated Dojo from 1.10.6 to 1.10.7 (Erik H)
+* Add missing defaults in ledgersmb.conf 'database' section (David G, #2632)
+* Add 2 missing RHEL dependencies to Makefile (David G)
+* Add conf/README.md describing the content of conf/ (David G)
+* Fixed bug in template processing only seen on CentOS (Chris T)
+* Transaction forgets payment account on Update (Nick P, #2580)
+* Updates to sample config and Makefile (Bill O)
+* Improved table reading experience for dynatable based reports (Erik H)
+* Fix file attachments shown twice after migration from 1.3 (Erik H, #2659)
+* Fix two issues in the 1.3->1.5 migration script (Erik H)
+
+Erik H is Erik Huelsmann
+David G is David Godfrey
+Chris T is Chris Travers
+Nick P is Nick Prater
+Bill O is Bill Ott
+
 
 Changelog for 1.5.3
 * Fix access to contact data for database admins (Erik H)
 * Fix Reconciliation Submit button not enabled (Nick P)
 * Fix Batch Search for approved transactions (Chris T)
 * Compensate for CVE-2016-1238 ('.' no longer in @INC) (Erik H)
-* Fix Invoice line item descriptions not visible until clicked (Erik H, 2607)
+* Fix Invoice line item descriptions not visible until clicked (Erik H, #2607)
 * Fix payment amounts in Cash->Reports->Receipts (Erik H, 2618)
 
 Nick P is Nick Prater
@@ -132,8 +469,48 @@ JohnL is John Locke
 Changelog for 1.4 Series
 Released 2014-09-15
 
+Changelog for 1.4.42
+* Fix goods/services search with AR/AP invoices (Chris T, #2938)
+* Fix ar/ap not searchable by part number (Chris T, #2926)
+* Round-trip fewer values over web requests during migration (Erik H)
+* Bank account info now properly HTML-escaped (Erik H, #2820)
+* Ensure forked sub-processes to be correctly terminated (Erik H)
+* Fix missing content in columns of the outstanding report (Erik H, #2585)
+* Fix contacts search ignores e-mail and phone filters (Erik H, #2821)
+* Fix contacts search by address data doesn't work (Erik H, #2490)
+
+Chris T is Chris Travers
+Erik H is Erik Huelsmann
+
+
+Changelog for 1.4.41
+* Fix 'Bad interval' error with PNL comparisons (Erik H, #2146)
+* Refactor filter pages for income statement and balance sheet (Erik H)
+* Follow-up to earlier compensation for '.' missing from @INC (Erik H, #2275)
+* Fix reversal of payments against non-eca-default AR/AP account (Erik H, #2558)
+
+Erik H is Erik Huelsmann
+
+
+Changelog for 1.4.40
+* Fix name of the sequence being updated in the 1.3 migration script (Erik H)
+
+Erik H is Erik Huelsmann
+
+
 Changelog for 1.4.39
 * Fixed searching for approved batches (Chris T, #2592)
+* Don't cache per-company (from database) templates (Erik H, #2573)
+* Don't block database administrator access to Contacts (Erik H)
+* Compensate for the removal of '.' from @INC on newer Perl versions (Erik H)
+* Fix payments sometimes double-counted in Cash>Reports>Receipts (Erik H, #2618)
+* Remove reference to removed JS files, silencing logs (Chris T)
+* Fix bug reading templates directory (only seen on CentOS) (Chris T)
+* Fix attachments showing up twice after 1.3->1.4 migration (Erik H, #2659)
+
+Chris T is Chris Travers
+Erik H is Erik Huelsmann
+
 
 Changelog for 1.4.38
 * Printed credit invoice indistinguishible from regular invoice (Erik H, #2546)
@@ -184,8 +561,10 @@ Changelog for 1.4.34
 * Fixed PNL comparison periods selection resulting in error (Erik H, #2148)
 * Fixed PNL hierarchies both selected (Erik H, #2147)
 * Fixed error at bottom of invoice, under Starman (Erik H)
+* Add test and hard fail with error if tempdir permissions aren't sane. (David G)
 
 Erik H is Erik Huelsmann
+David G is David Godfrey
 
 
 Changelog for 1.4.33
@@ -221,9 +600,11 @@ Changelog for 1.4.31
 * Fixed can't log into companies with & in their names (Chris T, #1004)
 * Added NZ chart of accounts (Kiwi)
 * Fixed can't create checkpoints before transactions (Chris T, #1704)
-# Fixed contact_all insufficient to create contacts (Chris T, #1219)
+* Fixed contact_all insufficient to create contacts (Chris T, #1219)
+* Fixed internal server errors on debian following upgrade (Chris T and Erik H)
 
 Chris T is Chris Travers
+Erik H is Erik Huelsmann
 
 
 Changelog for 1.4.30
@@ -529,6 +910,8 @@ Changelog for 1.4.12
 
 Chris T is Chris Travers
 Erik H is Erik Huelsmann
+
+
 Changelog for 1.4.11
 * Fixed account dropdowns on default screen (Nick P)
 * Fixed broken comparison with oldvendor (Nick P)
@@ -551,6 +934,8 @@ Chris T is Chris Travers
 Nick P is Nick Prater
 Erik H is Erik Huelsmann
 Pongracz I is Istvan Pongracz
+
+
 Changelog for 1.4.10
 * Note:  Corrected version numbers in 1.4.10.1, 1.4.10 had 1.4.9 as version
 * Malay translation added (Kaiser F, and others)
@@ -575,9 +960,11 @@ Erik H is Erik Huelsmann
 John L is John Locke
 
 Changelog for 1.4.9
+* Fixed issue with contacts not loading in 1.4,8 (regression, Chris T)
 * Removed optional dependency on LaTeX from starman preload (Chris T)
 
 Chris T is Chris Travers
+
 
 Changelog for 1.4.8
 * Fixed end-date not a date widget on employee div (Chris T)
@@ -703,7 +1090,8 @@ Changelog for 1.4.1
 
 Chris T is Chris Travers
 Erik H is Erik Huelsmann
-Pongracz I is Pongracz IstvÃan
+Pongracz I is Pongracz Istvan
+
 
 Changelog for 1.4.0
 General Enhancements:
@@ -826,9 +1214,12 @@ Changelog for 1.3.46
 * Some log quieting fixes. (Chris T)
 * Fixed bug 1262, cannot post overpayment with formatted numbers (Chris T)
 * Fixed bug 1260, Multiple vendor skus breaks display of invoice (Chris T)
+* Fixed bug 1273, some invoices cannot be opened (John L)
 
 Chris T is Chris Travers
+John L is John Locke
 Pongracz I is Pongracz Istvan
+
 
 Changelog for 1.3.45
 * Cleaned up sql files so App::LedgerSMB::Admin works (Chris T)
@@ -883,12 +1274,14 @@ Changelog for 1.3.42
 * Fix for invoice with shipto linking to wrong one on report (Chris T, 1104)
 * Fix for shipto's not being automatically checked (Chris T, 1100)
 * Fixed forex rounding issue with single payments not posting (Chris T)
+* Fixed typo in search payment form: aligh -> align (Pongracz I)
 
 Chris T is Chris Travers
 Pongracz I is Pongracz Istvan
 
 Changelog for 1.3.41
 * Fix for invalid ref when entering payment  (John Locke)
+
 
 Changelog for 1.3.40
 * Updated nginx configuration (Pongracz I)
@@ -897,9 +1290,8 @@ Changelog for 1.3.40
 * Fixed internal server error using cash/payment (Chris T)
 * Fixed #1133 (FX rate changed after selecting part/service) (Pongracz I)
 * Fixed #1078 (Don't populate all empty projects automatically) (Pongracz I)
-* Fixed #1139 (Vendor can show up as default customer in sales order,
-confusing...) (Pongracz I)
-* fixes cogs qty/allocated type mismatch (Chris T)
+* Fixed #1139 (Vendor can show up as default customer in sales order, confusing...) (Pongracz I)
+* Fixed type mismatch between invoice.qty and invoice.allocated (Chris T)
 * Fixed manual tax invoices not reversing properly (Chris T, 1134)
 
 Chris T is Chris Travers

@@ -1,8 +1,11 @@
+
+package LedgerSMB::Entity::Credit_Account;
+
 =head1 NAME
 
 LedgerSMB::Entity::Credit_Account - Customer/Vendor Acct Management for LSMB
 
-=head1 SYNOPSYS
+=head1 SYNOPSIS
 
 To get by ID:
 
@@ -27,8 +30,8 @@ and the like.
 
 =cut
 
-package LedgerSMB::Entity::Credit_Account;
 use Moose;
+use namespace::autoclean;
 use LedgerSMB::MooseTypes;
 with 'LedgerSMB::PGObject';
 
@@ -434,12 +437,13 @@ sub save_pricematrix {
                                       args => \@args);
         }
     }
+    return;
 }
 
 
 =back
 
-=head1 COPYRIGHT
+=head1 LICENSE AND COPYRIGHT
 
 Copyright (C) 2012 The LedgerSMB Core Team. This file may be reused under the
 terms of the GNU General Public License version 2 or at your option any later

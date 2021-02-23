@@ -41,6 +41,8 @@
 
 package lsmb_legacy;
 use Try::Tiny;
+
+use LedgerSMB::Legacy_Util;
 use LedgerSMB::Template;
 use LedgerSMB::Company_Config;
 
@@ -54,8 +56,6 @@ if ( -f "old/bin/custom/arapprn.pl" ) {
 if ( -f "old/bin/custom/$form->{login}_arapprn.pl" ) {
     eval { require "old/bin/custom/$form->{login}_arapprn.pl"; };
 }
-
-1;
 
 # end of main
 
@@ -87,7 +87,7 @@ sub print {
     if ( $form->{media} !~ /screen/ ) {
         $form->error( $locale->text('Select postscript or PDF!')  )
           if $form->{format} !~ /(postscript|pdf)/;
-        $old_form = new Form;
+        $old_form = Form->new;
         for ( keys %$form ) { $old_form->{$_} = $form->{$_} }
     }
 
@@ -122,7 +122,7 @@ sub print {
 
     $form->{queued} .= " $form->{formname} $filename";
     $form->{queued} =~ s/^ //;
-    $printform = new Form;
+    $printform = Form->new;
     for ( keys %$form ) {
         $printform->{$_} = $form->{$_};
     }
@@ -146,10 +146,9 @@ sub print_transaction {
       ( $form->{display_form} ) ? $form->{display_form} : "display_form";
 
     &{"$form->{vc}_details"};
-    @a = qw(name address1 address2 city state zipcode country);
 
     $form->{invtotal} = 0;
-    foreach $i ( 1 .. $form->{rowcount} - 1 ) {
+    foreach my $i ( 1 .. $form->{rowcount} - 1 ) {
         ( $form->{tempaccno}, $form->{tempaccount} ) = split /--/,
           $form->{"$form->{ARAP}_amount_$i"};
         ( $form->{tempprojectnumber} ) = split /--/,
@@ -168,10 +167,8 @@ sub print_transaction {
           $form->parse_amount( \%myconfig, $form->{"amount_$i"} );
 
     }
-    foreach $accno ( split / /, $form->{taxaccounts} ) {
+    foreach my $accno ( split / /, $form->{taxaccounts} ) {
         if ( $form->{"tax_$accno"} ) {
-            $form->format_string("${accno}_description");
-
             $tax += $form->parse_amount( \%myconfig, $form->{"tax_$accno"} );
 
             $form->{"${accno}_tax"} = $form->{"tax_$accno"};
@@ -191,15 +188,10 @@ sub print_transaction {
     }
 
     $tax = 0 if $form->{taxincluded};
-
-    push @a, $form->{ARAP};
-    $form->format_string(@a);
-
     $form->{paid} = 0;
-    for $i ( 1 .. $form->{paidaccounts} - 1 ) {
+    foreach my $i ( 1 .. $form->{paidaccounts} - 1 ) {
 
         if ( $form->{"paid_$i"} ) {
-            @a = ();
             $form->{paid} +=
               $form->parse_amount( \%myconfig, $form->{"paid_$i"} );
 
@@ -208,9 +200,6 @@ sub print_transaction {
                   $locale->date( \%myconfig, $form->{"datepaid_$i"},
                     $form->{longformat} );
             }
-
-            push @a, "$form->{ARAP}_paid_$i", "source_$i", "memo_$i";
-            $form->format_string(@a);
 
             ( $accno, $account ) = split /--/, $form->{"$form->{ARAP}_paid_$i"};
 
@@ -232,29 +221,22 @@ sub print_transaction {
     $form->{decimal}        = substr( $form->{decimal}, 0, 2 );
     $form->{integer_amount} = $form->format_amount( \%myconfig, $whole );
 
-    for (qw(invtotal subtotal paid total)) {
-        $form->{$_} = $form->format_amount( \%myconfig, $form->{$_}, 2 );
+    foreach my $field (qw(invtotal subtotal paid total)) {
+        $form->{$field} = $form->format_amount( \%myconfig, $form->{$field}, 2 );
     }
 
     ( $form->{employee} ) = split /--/, $form->{employee};
 
     if ( exists $form->{longformat} ) {
-        for (qw(duedate transdate crdate)) {
-            $form->{$_} =
-              $locale->date( \%myconfig, $form->{$_}, $form->{longformat} );
+        foreach my $field (qw(duedate transdate crdate)) {
+            $form->{$field} =
+              $locale->date( \%myconfig, $form->{$field}, $form->{longformat} );
         }
     }
 
     $form->{notes} =~ s/^\s+//g;
-
-    @a = ( "invnumber", "transdate", "duedate", "crdate", "notes" );
-
-    push @a,
-      qw(company address tel fax businessnumber text_amount text_decimal);
-
     $form->{invdate} = $form->{transdate};
 
-    $form->{templates} = "$myconfig{templates}";
     if ($form->{formname} eq 'transaction' ){
         $form->{IN} = lc $form->{ARAP} . "_$form->{formname}.html";
         $form->{formname} = lc $form->{ARAP} . "_$form->{formname}";
@@ -285,7 +267,7 @@ sub print_transaction {
         $form->{queued} =~ s/^ //;
 
         # save status
-        $form->update_status( \%myconfig, 1);
+        $form->update_status;
 
         $old_form->{queued} = $form->{queued};
     }
@@ -302,7 +284,7 @@ sub print_transaction {
             $form->{printed} .= " $form->{formname}";
             $form->{printed} =~ s/^ //;
 
-            $form->update_status( \%myconfig, 1);
+            $form->update_status;
         }
 
         $old_form->{printed} = $form->{printed} if %$old_form;
@@ -311,14 +293,17 @@ sub print_transaction {
     $form->{fileid} = $form->{invnumber};
     $form->{fileid} =~ s/(\s|\W)+//g;
 
+    my %output_options = (
+        filename => "$form->{formname}-$form->{invnumber}.$form->{format}"
+        );
     my $template = LedgerSMB::Template->new(
-        user => \%myconfig, template => $form->{'formname'},
+        user => \%myconfig,
+        template => $form->{'formname'},
+        path => 'DB',
         locale => $locale,
-    no_auto_output => 1,
+        output_options => \%output_options,
         format => uc $form->{format} );
-
-    $template->render($form);
-    $template->output(%{$form});
+    LedgerSMB::Legacy_Util::render_template($template, $form);
 
     if (%$old_form) {
         $old_form->{invnumber} = $form->{invnumber};
@@ -328,20 +313,21 @@ sub print_transaction {
         for ( keys %$old_form ) { $form->{$_} = $old_form->{$_} }
 
         if ( !$form->{printandpost} ) {
-            for (qw(exchangerate creditlimit creditremaining)) {
-                $form->{$_} = $form->parse_amount( \%myconfig, $form->{$_} );
+            foreach my $field (qw(exchangerate creditlimit creditremaining)) {
+                $form->{$field} = $form->parse_amount( \%myconfig, $form->{$field} );
             }
 
-            for ( 1 .. $form->{rowcount} ) {
-                $form->{"amount_$_"} =
-                  $form->parse_amount( \%myconfig, $form->{"amount_$_"} );
-            }
-            for ( split / /, $form->{taxaccounts} ) {
-                $form->{"tax_$_"} =
-                  $form->parse_amount( \%myconfig, $form->{"tax_$_"} );
+            foreach my $i ( 1 .. $form->{rowcount} ) {
+                $form->{"amount_$i"} =
+                  $form->parse_amount( \%myconfig, $form->{"amount_$i"} );
             }
 
-            for $i ( 1 .. $form->{paidaccounts} ) {
+            foreach my $account ( split / /, $form->{taxaccounts} ) {
+                $form->{"tax_$account"} =
+                  $form->parse_amount( \%myconfig, $form->{"tax_$account"} );
+            }
+
+            foreach my $i ( 1 .. $form->{paidaccounts} ) {
                 for (qw(paid exchangerate)) {
                     $form->{"${_}_$i"} =
                       $form->parse_amount( \%myconfig, $form->{"${_}_$i"} );
@@ -371,3 +357,4 @@ sub print_and_post {
 
 }
 
+1;

@@ -1,9 +1,11 @@
 
+package LedgerSMB::Scripts::menu;
+
 =head1 NAME
 
 LedgerSMB::Scripts::menu - LedgerSMB controller script for menus
 
-=head1 SYOPSIS
+=head1 DESCRIPTION
 
 This script provides a controller class for generating menus.  It can operate in
 two modes:  One creates a standard expanding menu which works with or without
@@ -13,8 +15,6 @@ devices.
 =head1 METHODS
 
 =cut
-
-package LedgerSMB::Scripts::menu;
 
 use LedgerSMB::DBObject::Menu;
 use LedgerSMB::Template;
@@ -38,10 +38,8 @@ and route to the appropriate function.  It routes to expanding_menu.
 
 sub __default {
     my ($request) = @_;
-    if ($request->{new}){
-        return root_doc($request);
-    }
-    return expanding_menu($request);
+
+    return root_doc($request);
 }
 
 =pod
@@ -66,65 +64,44 @@ sub root_doc {
 
     my $menu = LedgerSMB::DBObject::Menu->new({base => $request});
     $menu->generate();
-    for my $item (@{$menu->{menu_items}}){
-        if ($request->{'open'}
-            && $request->{'open'} =~ /:$item->{id}:/ ){
-            $item->{'open'} = 'true';
-        }
-    }
 
-    $template = LedgerSMB::Template->new(
-        user =>$request->{_user},
-        locale => $request->{_locale},
-        path => 'UI',
+    $template = LedgerSMB::Template->new_UI(
+        $request,
         template => 'main',
-        format => 'HTML'
     );
-    return $template->render_to_psgi($menu);
+    return $template->render($menu);
 }
 
 =pod
 
 =over
 
-=item expanding_menu
+=item menuitems_json
 
-This function generates an expanding menu.  By default all nodes are closed, but
-there nodes which are supposed to be open are marked.
-
+Returns the menu items in JSON format
 
 =back
 
+
 =cut
 
-sub expanding_menu {
+sub menuitems_json {
     my ($request) = @_;
-    if ($request->{'open'} !~ s/:$request->{id}:/:/){
-    $request->{'open'} .= ":$request->{id}:";
-    }
-
-    # The above system can lead to extra colons.
-    $request->{'open'} =~ s/:+/:/g;
-
-
+    my $locale = $request->{_locale};
     my $menu = LedgerSMB::DBObject::Menu->new({base => $request});
-    $menu->generate();
-    for my $item (@{$menu->{menu_items}}){
-        if ($request->{'open'} =~ /:$item->{id}:/ ){
-            $item->{'open'} = 'true';
-        }
-    }
 
-    my $template = LedgerSMB::Template->new(
-         user => $request->{_user},
-         locale => $request->{_locale},
-         path => 'UI/menu',
-         template => 'expanding',
-         format => 'HTML',
-    );
-    return $template->render_to_psgi($menu);
+    $menu->generate;
+    $_->{label} = $locale->maketext($_->{label})
+        for (@{$menu->{menu_items}});
+
+    return $request->to_json( $menu->{menu_items} );
 }
 
+=pod
+
+=over
+
+=back
 
 =head1 Copyright (C) 2007 The LedgerSMB Core Team
 
@@ -134,6 +111,29 @@ files.
 
 =cut
 
-###TODO-LOCALIZE-DOLLAR-AT
-eval { do "scripts/custom/menu.pl"};
+{
+    local ($!, $@) = ( undef, undef);
+    my $do_ = 'scripts/custom/menu.pl';
+    if ( -e $do_ ) {
+        unless ( do $do_ ) {
+            if ($! or $@) {
+                warn "\nFailed to execute $do_ ($!): $@\n";
+                die (  "Status: 500 Internal server error (menu.pm)\n\n" );
+            }
+        }
+    }
+};
+
+=head1 LICENSE AND COPYRIGHT
+
+Copyright (C) 2007-2018 The LedgerSMB Core Team
+
+This file is licensed under the Gnu General Public License version 2, or at your
+option any later version.  A copy of the license should have been included with
+your software.
+
+=cut
+
+
+
 1;

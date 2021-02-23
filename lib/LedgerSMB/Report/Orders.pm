@@ -1,3 +1,6 @@
+
+package LedgerSMB::Report::Orders;
+
 =head1 NAME
 
 LedgerSMB::Report::Orders - Search for Orders and Quotations in LedgerSMB
@@ -9,11 +12,12 @@ LedgerSMB::Report::Orders - Search for Orders and Quotations in LedgerSMB
 
 =cut
 
-package LedgerSMB::Report::Orders;
 use Moose;
+use namespace::autoclean;
 extends 'LedgerSMB::Report';
 with 'LedgerSMB::Report::Dates';
 use LedgerSMB::MooseTypes;
+use LedgerSMB::Magic qw( OEC_SALES_ORDER OEC_PURCHASE_ORDER OEC_QUOTATION OEC_RFQ );
 
 =head1 DESCRIPTION
 
@@ -182,16 +186,16 @@ sub columns {
     my ($self) = @_;
     my $ORDNUMBER;
     my $METANUMBER;
-    if (1 == $self->oe_class_id){
+    if (OEC_SALES_ORDER == $self->oe_class_id){
        $ORDNUMBER = $self->Text('Sales Orders');
        $METANUMBER = $self->Text('Customer');
-    } elsif (2 == $self->oe_class_id){
+    } elsif (OEC_PURCHASE_ORDER == $self->oe_class_id){
        $ORDNUMBER = $self->Text('Purchase Orders');
        $METANUMBER = $self->Text('Vendor');
-    } elsif (3 == $self->oe_class_id){
+    } elsif (OEC_QUOTATION == $self->oe_class_id){
        $ORDNUMBER = $self->Text('Quotations');
        $METANUMBER = $self->Text('Customer');
-    } elsif (4 == $self->oe_class_id){
+    } elsif (OEC_RFQ == $self->oe_class_id){
        $ORDNUMBER = $self->Text('RFQs');
        $METANUMBER = $self->Text('Vendor');
     } else {
@@ -283,13 +287,13 @@ sub header_lines {
 
 sub name {
     my ($self) = @_;
-    if (1 == $self->oe_class_id){
+    if (OEC_SALES_ORDER == $self->oe_class_id){
        return $self->Text('Sales Orders');
-    } elsif (2 == $self->oe_class_id){
+    } elsif (OEC_PURCHASE_ORDER == $self->oe_class_id){
        return $self->Text('Purchase Orders');
-    } elsif (3 == $self->oe_class_id){
+    } elsif (OEC_QUOTATION == $self->oe_class_id){
        return $self->Text('Quotations');
-    } elsif (4 == $self->oe_class_id){
+    } elsif (OEC_RFQ == $self->oe_class_id){
        return $self->Text('RFQs');
     } else {
         die 'Unsupported OE Class Type';
@@ -311,10 +315,10 @@ sub run_report {
     for my $r(@rows){
        $r->{row_id} = $r->{id};
     }
-    $self->rows(\@rows);
+    return $self->rows(\@rows);
 }
 
-=head1 COPYRIGHT
+=head1 LICENSE AND COPYRIGHT
 
 COPYRIGHT (C) 2012 The LedgerSMB Core Team.  This file may be re-used under the
 terms of the LedgerSMB General Public License version 2 or at your option any

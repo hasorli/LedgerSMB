@@ -1,4 +1,3 @@
-<?lsmb INCLUDE 'ui-header.html' ?>
 <?lsmb PROCESS 'elements.html' ?>
 <body class="lsmb <?lsmb dojo_theme ?>">
 
@@ -13,7 +12,7 @@
   <tr>
     <th class="listtop">Balance y Mayor</th>
   </tr>
-  <tr height="5"></tr>
+  <tr style="height:5px"></tr>
   <tr>
     <td>
       <table>
@@ -89,7 +88,7 @@
                                    type="checkbox"
                                    value="Y"
                                    checked="checked"
-                            } ?> <?lsmb text('starting_balance') ?></td>
+                            } ?> <?lsmb text('Starting Balance') ?></td>
                   <td nowrap><?lsmb PROCESS input element_data = {
                                    name="col_debits"
                                    class="checkbox"
@@ -145,5 +144,3 @@
 </form>
 
 </body>
-</html>
-

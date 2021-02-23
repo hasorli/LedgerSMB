@@ -46,6 +46,9 @@ use LedgerSMB::App_State;
 use LedgerSMB::Num2text;
 use Log::Log4perl;
 
+use LedgerSMB::IS qw(BC_SALES_INVOICE);
+
+
 my $logger = Log::Log4perl->get_logger('LedgerSMB::IS');
 
 
@@ -112,14 +115,10 @@ sub invoice_details {
     my $projectdescription;
     my $projectnumber_id;
     my $translation;
-    my $partsgroup;
-
     my @taxaccounts;
     my %taxaccounts;
     my $taxrate;
     my $taxamount;
-
-    my %translations;
 
     $query = qq|
            SELECT p.description, t.description
@@ -140,7 +139,7 @@ sub invoice_details {
 
 
     # sort items by project and partsgroup
-    for $i ( 1 .. $form->{rowcount} - 1 ) {
+    foreach my $i ( 1 .. $form->{rowcount} - 1 ) {
 
         # account numbers
         $pth->execute( $form->{"id_$i"} );
@@ -197,9 +196,6 @@ sub invoice_details {
                   if $projectnumber_id;
                 $form->{projectnumber} .= $form->{partsgroup};
             }
-
-            $form->format_string($form->{projectnumber});
-
         }
 
         $sortby = qq|$projectnumber$form->{partsgroup}|;
@@ -224,7 +220,7 @@ sub invoice_details {
 
     # sort the whole thing by project and group
 
-    @sortlist = sort { $a->[5] cmp $b->[5] } @sortlist;
+    @sortlist = sort { $a->[5] cmp $b->[5] } @sortlist;  ## no critic (ProhibitMagicNumbers) sniff
 
     my $runningnumber = 1;
     my $sameitem      = "";
@@ -232,7 +228,7 @@ sub invoice_details {
     my $k = scalar @sortlist;
     my $j = 0;
 
-    foreach $item (@sortlist) {
+    foreach my $item (@sortlist) {
 
         $i = $item->[0];
         $j++;
@@ -628,7 +624,7 @@ sub invoice_details {
         );
     }
 
-    for $i ( 1 .. $form->{paidaccounts} ) {
+    foreach my $i ( 1 .. $form->{paidaccounts} ) {
         if ( $form->{"paid_$i"} ) {
             push( @{ $form->{payment} }, $form->{"paid_$i"} );
             my ( $accno, $description ) = split /--/, $form->{"AR_paid_$i"};
@@ -669,8 +665,6 @@ sub invoice_details {
     $form->{text_decimal}   = $c->num2text( $form->{decimal} * 1 );
     $form->{text_amount}    = $c->num2text($whole);
     $form->{integer_amount} = $form->format_amount( $myconfig, $whole );
-
-    $form->format_string(qw(text_amount text_decimal));
 
     $form->{invtotal} ||= 0;
     $form->{paid} ||= 0;
@@ -777,7 +771,7 @@ sub post_invoice {
 
     ( $null, $form->{employee_id} ) = split /--/, $form->{employee};
     unless ( $form->{employee_id} ) {
-        ( $form->{employee}, $form->{employee_id} ) = $form->get_employee($dbh);
+        ( $form->{employee}, $form->{employee_id} ) = $form->get_employee;
     }
 
     ( $null, $form->{department_id} ) = split( /--/, $form->{department} );
@@ -860,7 +854,7 @@ sub post_invoice {
           VALUES (currval('invoice_id_seq'), ?, ?)"
     );
 
-    foreach $i ( 1 .. $form->{rowcount} ) {
+    foreach my $i ( 1 .. $form->{rowcount} ) {
         my $allocated = 0;
         $form->{"qty_$i"} = $form->parse_amount( $myconfig, $form->{"qty_$i"} );
         if ($form->{reverse}){
@@ -1034,7 +1028,7 @@ sub post_invoice {
                 $sth = $dbh->prepare(
                    'INSERT INTO voucher (batch_id, trans_id, batch_class)
                     VALUES (?, ?, ?)');
-                $sth->execute($form->{batch_id}, $form->{id}, 8);
+                $sth->execute($form->{batch_id}, $form->{id}, BC_SALES_INVOICE);
             }
 
             for my $cls(@{$form->{bu_class}}){
@@ -1053,8 +1047,8 @@ sub post_invoice {
                 $dbh->prepare($query)->execute($form->{approved}, $form->{id})
                      || $form->dberror($query);
                 if (!$form->{approved}){
-                   if (not defined $form->{batch_id}){
-                       $form->error($locale->text('Batch ID Missing'));
+                    if (not defined $form->{batch_id}){
+                       $form->error('Batch ID Missing');
                    }
                    $query = qq|
             INSERT INTO voucher (batch_id, trans_id) VALUES (?, ?)|;
@@ -1071,7 +1065,7 @@ sub post_invoice {
     }
 
     $form->{paid} = 0;
-    for $i ( 1 .. $form->{paidaccounts} ) {
+    foreach my $i ( 1 .. $form->{paidaccounts} ) {
         $form->{"paid_$i"} =
           $form->parse_amount( $myconfig, $form->{"paid_$i"} )->bstr();
         $form->{paid} += $form->{"paid_$i"};
@@ -1122,7 +1116,7 @@ sub post_invoice {
           VALUES (currval('acc_trans_entry_id_seq'), ?, ?)"
     );
 
-    foreach $ref ( sort { $b->{amount} <=> $a->{amount} }
+    foreach my $ref ( sort { $b->{amount} <=> $a->{amount} }
         @{ $form->{acc_trans}{lineitems} } )
     {
         $diff ||= 0;
@@ -1165,7 +1159,7 @@ sub post_invoice {
               "INSERT INTO tax_extended (entry_id, tax_basis, rate)
                     VALUES (currval('acc_trans_entry_id_seq'), ?, ?)"
         );
-        for $taccno (split / /, $form->{taxaccounts}){
+        foreach my $taccno (split / /, $form->{taxaccounts}){
             my $taxamount;
             my $taxbasis;
             my $taxrate;
@@ -1247,7 +1241,7 @@ sub post_invoice {
     my $cleared = 0;
 
     # record payments and offsetting AR
-    for $i ( 1 .. $form->{paidaccounts} ) {
+    foreach my $i ( 1 .. $form->{paidaccounts} ) {
 
         if ( $form->{"paid_$i"} ) {
             my ($accno) = split /--/, $form->{"AR_paid_$i"};
@@ -1445,7 +1439,7 @@ sub post_invoice {
     # add shipto
     $form->{name} = $form->{customer};
     $form->{name} =~ s/--$form->{customer_id}//;
-    $form->add_shipto( $dbh, $form->{id} );
+    $form->add_shipto($form->{id});
 
     # save printed, emailed and queued
     $form->save_status($dbh);
@@ -1453,6 +1447,8 @@ sub post_invoice {
     if (!$form->{separate_duties}){
         $self->add_cogs($form);
     }
+
+    return 1;
 }
 
 sub retrieve_invoice {
@@ -1777,7 +1773,7 @@ sub exchangerate_defaults {
     my $eth2 = $dbh->prepare($query) || $form->dberror($query);
 
     # get exchange rates for transdate or max
-    foreach $var ( split /:/, substr( $form->{currencies}, 4 ) ) {
+    foreach my $var ( split /:/, substr( $form->{currencies}, 4 ) ) {  ## no critic (ProhibitMagicNumbers) sniff
         $eth1->execute( $var, $form->{transdate} );
         ( $form->{$var} ) = $eth1->fetchrow_array;
 
@@ -1972,7 +1968,7 @@ sub construct_types
     while(my $ref = $sth->fetchrow_hashref(NAME_lc))
     {
 
-      $returnvalue.=qq|<option value="$ref->{id} ">|.substr($ref->{class},0,3).qq|</option>|;
+      $returnvalue.=qq|<option value="$ref->{id} ">|.substr($ref->{class},0,3).qq|</option>|;  ## no critic (ProhibitMagicNumbers) sniff
 
     }
 
@@ -1998,7 +1994,7 @@ sub createlocation
 
    $sth->execute($form->{"customer_id"},
          undef,
-         3,
+         3,  ## no critic (ProhibitMagicNumbers) sniff
          $form->{"shiptoaddress1_new"},
          $form->{"shiptoaddress2_new"},
          $form->{"shiptoaddress3_new"},

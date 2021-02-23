@@ -37,10 +37,9 @@ use LedgerSMB::AM;
 use LedgerSMB::Form;
 use LedgerSMB::User;
 use LedgerSMB::GL;
+use LedgerSMB::Legacy_Util;
 use LedgerSMB::Template;
 use LedgerSMB::Sysconfig;
-
-1;
 
 # end of main
 
@@ -111,10 +110,9 @@ sub add_gifi {
     &gifi_footer(\%hiddens, \@buttons);
 
     my $template = LedgerSMB::Template->new_UI(
-        user => \%myconfig,
-        locale => $locale,
+        $form,
         template => 'am-gifi-form');
-    $template->render({
+    LedgerSMB::Legacy_Util::render_template($template, {
         form => $form,
         buttons => \@buttons,
         hiddens => \%hiddens,
@@ -137,10 +135,9 @@ sub edit_gifi {
     &gifi_footer(\%hiddens, \@buttons);
 
     my $template = LedgerSMB::Template->new_UI(
-        user => \%myconfig,
-        locale => $locale,
+        $form,
         template => 'am-gifi-form');
-    $template->render({
+    LedgerSMB::Legacy_Util::render_template($template, {
         form => $form,
         buttons => \@buttons,
         hiddens => \%hiddens,
@@ -230,10 +227,9 @@ sub add_business {
     &form_footer_buttons(\%hiddens, \@buttons);
 
     my $template = LedgerSMB::Template->new_UI(
-        user => \%myconfig,
-        locale => $locale,
+        $form,
         template => 'am-business-form');
-    $template->render({
+    LedgerSMB::Legacy_Util::render_template($template, {
         form => $form,
         buttons => \@buttons,
         hiddens => \%hiddens,
@@ -255,10 +251,9 @@ sub edit_business {
     &form_footer_buttons(\%hiddens, \@buttons);
 
     my $template = LedgerSMB::Template->new_UI(
-        user => \%myconfig,
-        locale => $locale,
+        $form,
         template => 'am-business-form');
-    $template->render({
+    LedgerSMB::Legacy_Util::render_template($template, {
         form => $form,
         buttons => \@buttons,
         hiddens => \%hiddens,
@@ -311,10 +306,9 @@ sub add_sic {
     &form_footer_buttons(\%hiddens, \@buttons);
 
     my $template = LedgerSMB::Template->new_UI(
-        user => \%myconfig,
-        locale => $locale,
+        $form,
         template => 'am-sic-form');
-    $template->render({
+    LedgerSMB::Legacy_Util::render_template($template, {
         form => $form,
         heading => $checked,
         buttons => \@buttons,
@@ -326,7 +320,7 @@ sub edit_sic {
 
     $form->{title} = "Edit";
 
-    $form->{code} =~ s/\\'/'/g;
+    $form->{code} =~ s/\\'/'/g; # ' # kludge the single quote for syntax highlighting
     $form->{code} =~ s/\\\\/\\/g;
 
     AM->get_sic( \%myconfig, \%$form );
@@ -339,10 +333,9 @@ sub edit_sic {
     &form_footer_buttons(\%hiddens, \@buttons);
 
     my $template = LedgerSMB::Template->new_UI(
-        user => \%myconfig,
-        locale => $locale,
+        $form,
         template => 'am-sic-form');
-    $template->render({
+    LedgerSMB::Legacy_Util::render_template($template, {
         form => $form,
         heading => $checked,
         buttons => \@buttons,
@@ -399,10 +392,9 @@ sub add_language {
     &form_footer_buttons(\%hiddens, \@buttons);
 
     my $template = LedgerSMB::Template->new_UI(
-        user => \%myconfig,
-        locale => $locale,
+        $form,
         template => 'am-language-form');
-    $template->render({
+    LedgerSMB::Legacy_Util::render_template($template, {
         form => $form,
         buttons => \@buttons,
         hiddens => \%hiddens,
@@ -415,7 +407,7 @@ sub edit_language {
 
     $form->{title} = "Edit";
 
-    $form->{code} =~ s/\\'/'/g;
+    $form->{code} =~ s/\\'/'/g; #' # kludge the single quote for syntax highlighting
     $form->{code} =~ s/\\\\/\\/g;
 
     AM->get_language( \%myconfig, \%$form );
@@ -428,10 +420,9 @@ sub edit_language {
     &form_footer_buttons(\%hiddens, \@buttons);
 
     my $template = LedgerSMB::Template->new_UI(
-        user => \%myconfig,
-        locale => $locale,
+        $form,
         template => 'am-language-form');
-    $template->render({
+    LedgerSMB::Legacy_Util::render_template($template, {
         form => $form,
         buttons => \@buttons,
         hiddens => \%hiddens,
@@ -462,41 +453,6 @@ sub save_language {
 
     AM->save_language( \%myconfig, \%$form );
 
-    if ( !-d "$myconfig{templates}/$form->{code}" ) {
-
-        umask(002);
-
-        if ( mkdir "$myconfig{templates}/$form->{code}", oct("771") ) {
-
-            umask(007);
-
-            opendir TEMPLATEDIR, "$myconfig{templates}"
-              or $form->error("$myconfig{templates} : $!");
-            @templates = grep !/^(\.|\.\.)/, readdir TEMPLATEDIR;
-            closedir TEMPLATEDIR;
-
-            foreach $file (@templates) {
-                if ( -f "$myconfig{templates}/$file" ) {
-                    open( TEMP, '<', "$myconfig{templates}/$file" )
-                      or $form->error("$myconfig{templates}/$file : $!");
-
-                    open( NEW, '>', "$myconfig{templates}/$form->{code}/$file" )
-                      or $form->error(
-                        "$myconfig{templates}/$form->{code}/$file : $!");
-
-                    while ( $line = <TEMP> ) {
-                        print NEW $line;
-                    }
-                    close(TEMP);
-                    close(NEW);
-                }
-            }
-        }
-        else {
-            $form->error("${templates}/$form->{code} : $!");
-        }
-    }
-
     $form->redirect( $locale->text('Language saved!') );
 
 }
@@ -514,10 +470,9 @@ sub delete_language {
         text => $locale->text('Delete Language'),
         });
     my $template = LedgerSMB::Template->new_UI(
-        user => \%myconfig,
-        locale => $locale,
+        $form,
         template => 'form-confirmation');
-    $template->render({
+    LedgerSMB::Legacy_Util::render_template($template, {
         form => $form,
         buttons => \@buttons,
         hiddens => \%hiddens,
@@ -531,12 +486,6 @@ sub yes_delete_language {
 
     AM->delete_language( \%myconfig, \%$form );
 
-    # delete templates
-    $dir = "$myconfig{templates}/$form->{code}";
-    if ( -d $dir ) {
-        unlink <$dir/*>;
-        rmdir "$myconfig{templates}/$form->{code}";
-    }
     $form->redirect( $locale->text('Language deleted!') );
 
 }
@@ -548,7 +497,7 @@ sub taxes {
     AM->taxes( \%myconfig, \%$form );
 
     $i = 0;
-    foreach $ref ( @{ $form->{taxrates} } ) {
+    foreach my $ref ( @{ $form->{taxrates} } ) {
         $i++;
         $form->{"minvalue_$i"} =
           $form->format_amount( \%myconfig, $ref->{minvalue}) || 0;
@@ -618,10 +567,9 @@ sub display_taxes {
     }
 
     my $template = LedgerSMB::Template->new_UI(
-        user => \%myconfig,
-        locale => $locale,
+        $form,
         template => 'am-taxes');
-    $template->render({
+    LedgerSMB::Legacy_Util::render_template($template, {
         form => $form,
     hiddens => \%hiddens,
     selects => \%selects,
@@ -637,7 +585,7 @@ sub update {
 
     AM->taxes( \%myconfig, \%$form );
 
-    foreach $item (@a) {
+    foreach my $item (@a) {
         ( $accno, $i ) = split /_/, $item;
         push @t, $accno;
 
@@ -724,10 +672,9 @@ sub add_warehouse {
     &form_footer_buttons(\%hiddens, \@buttons);
 
     my $template = LedgerSMB::Template->new_UI(
-        user => \%myconfig,
-        locale => $locale,
+        $form,
         template => 'am-warehouse-form');
-    $template->render({
+    LedgerSMB::Legacy_Util::render_template($template, {
         form => $form,
         row_count => $rows,
         buttons => \@buttons,
@@ -748,10 +695,9 @@ sub edit_warehouse {
     &form_footer_buttons(\%hiddens, \@buttons);
 
     my $template = LedgerSMB::Template->new_UI(
-        user => \%myconfig,
-        locale => $locale,
+        $form,
         template => 'am-warehouse-form');
-    $template->render({
+    LedgerSMB::Legacy_Util::render_template($template, {
         form => $form,
         row_count => $rows,
         buttons => \@buttons,
@@ -780,21 +726,15 @@ sub save_warehouse {
 
     $form->isblank( "description", $locale->text('Description missing!') );
     AM->save_warehouse( \%myconfig, \%$form );
-    _warehouse_redirect();
 
+    $form->redirect( $locale->text( 'Warehouse saved!'));
 }
 
 sub delete_warehouse {
 
     AM->delete_warehouse( \%myconfig, \%$form );
-    _warehouse_redirect();
 
-}
-
-sub _warehouse_redirect {
-    use LedgerSMB::Scripts::reports;
-    bless $form, 'LedgerSMB';
-    LedgerSMB::Scripts::reports::list_warehouse($lsmb);
+    $form->redirect( $locale->text( 'Warehouse deleted!'));
 }
 
 sub recurring_transactions {
@@ -912,7 +852,7 @@ sub recurring_transactions {
               : $locale->text('Next Number');
             $column_data{reference} = {
                 text => $reference,
-                href => qq|$form->{script}?action=edit_recurring&id=$ref->{id}&vc=$ref->{vc}&login=$form->{login}&sessionid=$form->{sessionid}&module=$ref->{module}&invoice=$ref->{invoice}&transaction=$ref->{transaction}&recurringnextdate=$ref->{nextdate}|,
+                href => qq|am.pl?action=edit_recurring&id=$ref->{id}&vc=$ref->{vc}&login=$form->{login}&sessionid=$form->{sessionid}&module=$ref->{module}&invoice=$ref->{invoice}&transaction=$ref->{transaction}&recurringnextdate=$ref->{nextdate}|,
                 };
 
             my $module = "$ref->{module}.pl";
@@ -985,10 +925,9 @@ sub recurring_transactions {
     };
 
     my $template = LedgerSMB::Template->new_UI(
-        user => \%myconfig,
-        locale => $locale,
+        $form,
         template => 'am-list-recurring');
-    $template->render({
+    LedgerSMB::Legacy_Util::render_template( $template, {
         form => $form,
         buttons => \@buttons,
         columns => \@column_index,
@@ -1042,7 +981,16 @@ sub edit_recurring {
     }
 
     $form->{script} = "$form->{module}.pl";
-    do "old/bin/$form->{script}";
+    {
+        local ($!, $@);
+        my $do_ = "old/bin/$form->{script}";
+        unless ( do $do_ ) {
+            if ($! or $@) {
+                print "Status: 500 Internal server error (am.pl)\n\n";
+                warn "Failed to execute $do_ ($!): $@\n";
+            }
+        }
+    };
 
     &{ $links{ $form->{module} } };
 
@@ -1066,7 +1014,7 @@ sub edit_recurring {
 
 sub process_transactions {
     # save variables
-    my $pt = new Form;
+    my $pt = Form->new;
     for ( keys %$form ) { $pt->{$_} = $form->{$_} }
 
     my $defaultprinter;
@@ -1097,7 +1045,7 @@ sub process_transactions {
             # something is not being copied back that needs to be.  Looking
             # forward to removing this code. --CT
             for ( keys %$form ) { delete $form->{$_}; }
-            for (qw(header dbversion company dbh login path sessionid
+            for (qw(header dbversion company dbh login path sessionid _auth
                     stylesheet timeout id)
             ) {
                 $form->{$_} = $pt->{$_};
@@ -1121,7 +1069,16 @@ sub process_transactions {
                         $form->{module} = "ap";
                         $invfld         = "vinumber";
                     }
-                    do "old/bin/$form->{script}";
+                    {
+                        local ($!, $@);
+                        my $do_ = "old/bin/$form->{script}";
+                        unless ( do $do_ ) {
+                            if ($! or $@) {
+                                print "Status: 500 Internal server error (am.pl)\n\n";
+                                warn "Failed to execute $do_ ($!): $@\n";
+                            }
+                        }
+                    };
 
                     if ( $pt->{invoice} ) {
                         &invoice_links;
@@ -1202,6 +1159,11 @@ sub process_transactions {
                     for (qw(invnumber reference)) {
                         $form->{$_} = $form->unquote( $form->{$_} );
                     }
+                    # Make sure the transaction isn't posted as a draft
+                    $form->{approved} = 1;
+                    # Make sure the posting procedure doesn't override
+                    # the 'approved' status
+                    $form->{separate_duties} = 0;
 
                     if ( $pt->{invoice} ) {
                         if ( $pt->{arid} ) {
@@ -1344,7 +1306,7 @@ sub process_transactions {
                 $form->{transdate} = $pt->{nextdate};
 
                 $j = 0;
-                foreach $ref ( @{ $form->{GL} } ) {
+                foreach my $ref ( @{ $form->{GL} } ) {
                     $form->{"accno_$j"} = "$ref->{accno}--$ref->{description}";
 
                     $form->{"projectnumber_$j"} =
@@ -1551,3 +1513,4 @@ sub search_taxform {
 
 sub continue { &{ $form->{nextsub} } }
 
+1;

@@ -1,3 +1,6 @@
+
+package LedgerSMB::Report::PNL::ECA;
+
 =head1 NAME
 
 LedgerSMB::Report::PNL::ECA - Income Statement-like Reports for Customers
@@ -19,8 +22,8 @@ up since they are treated as an expense only on sale.
 
 =cut
 
-package LedgerSMB::Report::PNL::ECA;
 use Moose;
+use namespace::autoclean;
 extends 'LedgerSMB::Report::PNL';
 
 =head1 CRITERIA PROPERTIES
@@ -132,7 +135,7 @@ sub report_base {
 
 =back
 
-=head1 COPYRIGHT
+=head1 LICENSE AND COPYRIGHT
 
 COPYRIGHT (C) 2012 The LedgerSMB Core Team.  This file may be re-used under the
 terms of the LedgerSMB General Public License version 2 or at your option any
@@ -140,4 +143,5 @@ later version.  Please see enclosed LICENSE file for details.
 
 =cut
 
+__PACKAGE__->meta->make_immutable;
 1;

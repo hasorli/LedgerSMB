@@ -24,7 +24,9 @@ they can be run separately as well, using the 'pherkin' test runner
 which comes with Test:BDD::Cucumber:
 
 ```sh
- $ PGUSER=postgres PGPASSWORD=password LSMB_BASE_URL="http://localhost:5000" \
+ $ PGUSER=postgres PGPASSWORD=password \
+     LSMB_BASE_URL="http://localhost:5000" \
+     PSGI_BASE_URL="http://localhost:5000" \
      pherkin t/66-cucumber/*/
 ```
 
@@ -39,7 +41,7 @@ In separate terminals, you need to run the following commands from the
 root of the development tree for the above to work:
 
 ```sh
- $ starman tools/starman.psgi
+ $ starman bin/ledgersmb-server.psgi
  $ phantomjs --webdriver=4422
 ```
 
@@ -52,12 +54,12 @@ The code consists of the following components:
  * Step files, which implement function specific steps, in a
    `step_definitions` subdirectory of each numbered directory
    (e.g. `01-basic/step_definitions/`)
- * `pherkin` extensions in `t/lib/Pherkin/Extension` which implement
+ * `pherkin` extensions in `xt/lib/Pherkin/Extension` which implement
    * `LedgerSMB`: Steps which define application state (provides
      database handle access)
    * `PageObject`: Steps to access the browser UI, common to most
      test scripts
- * `PageObject`s (in `t/lib/`)
+ * `PageObject`s (in `xt/lib/`)
    * implementing access to browser page
      functionality, deriving from `Weasel::Element`, thereby referring
      to their root DOM element
@@ -107,7 +109,7 @@ When a specific widget is expected to be returned, the receiver should
 use the session's wait_for() function to poll for the correct return
 type. The default settings for wait_for make it poll for a number of
 seconds.  A good example is the `Then 'I should see the <screen-name>
-screen'` step in `t/lib/Pherkin/Extensions/pageobject_steps/nav_steps.pl`.
+screen'` step in `xt/lib/Pherkin/Extensions/pageobject_steps/nav_steps.pl`.
 
 Caching accessors, such as `content` above, should be resistent to the
 'repeated accessing' pattern caused by this polling behaviour by validating

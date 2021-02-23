@@ -1,3 +1,6 @@
+
+package LedgerSMB::Report::Unapproved::Drafts;
+
 =head1 NAME
 
 LedgerSMB::Report::Unapproved::Drafts - Unapproved Drafts (single
@@ -24,8 +27,8 @@ transactions.
 
 =cut
 
-package LedgerSMB::Report::Unapproved::Drafts;
 use Moose;
+use namespace::autoclean;
 extends 'LedgerSMB::Report';
 with 'LedgerSMB::Report::Dates';
 
@@ -233,12 +236,12 @@ sub run_report{
         $ref->{reference_href_suffix} = "$script.pl?action=edit&id=$ref->{id}";
         $ref->{id_href_suffix} = $ref->{reference_href_suffix};
     }
-    $self->rows(\@rows);
+    return $self->rows(\@rows);
 }
 
 =back
 
-=head1 COPYRIGHT
+=head1 LICENSE AND COPYRIGHT
 
 COPYRIGHT (C) 2012 The LedgerSMB Core Team.  This file may be re-used following
 the terms of the GNU General Public License version 2 or at your option any

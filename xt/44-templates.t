@@ -11,6 +11,11 @@ use LedgerSMB::Database;
 use LedgerSMB::Template::DBProvider;
 use Test::More;
 
+use Log::Log4perl;
+use Log::Log4perl::Level ();
+
+Log::Log4perl->easy_init( Log::Log4perl::Level::to_priority( 'OFF' ) );
+
 my @missing = grep { ! $ENV{$_} } (qw(LSMB_NEW_DB LSMB_TEST_DB));
 plan skip_all => (join ', ', @missing) . ' not set' if @missing;
 
@@ -37,7 +42,8 @@ ok($provider->isa('Template::Provider'),
 my $dbh = LedgerSMB::Database->new(
     dbname => $ENV{LSMB_NEW_DB},
     username => $ENV{PGUSER},
-    password => $ENV{PGPASSWORD})
+    password => $ENV{PGPASSWORD},
+    host => $ENV{PGHOST})
     ->connect({ AutoCommit => 0, PrintError => 0, RaiseError => 1 });
 
 $dbh->do(qq|
@@ -53,7 +59,7 @@ VALUES ('provider-test1', 'en_US', 'The en_US language template',
 |);
 
 $provider = LedgerSMB::Template::DBProvider->new({
-    _DBH => $dbh,
+    _dbh => $dbh,
     language_code => undef,
     format => 'html',
 });
@@ -140,7 +146,7 @@ VALUES ('provider-test3', NULL, 'Hello <?lsmb name ?>, ....',
 
 $output = '';
 $provider = LedgerSMB::Template::DBProvider->new({
-    _DBH => $dbh,
+    _dbh => $dbh,
     language_code => undef,
     format => 'html',
     PARSER => Template::Parser->new({

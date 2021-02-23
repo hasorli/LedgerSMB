@@ -1,3 +1,6 @@
+
+package LedgerSMB::Report::Taxform::Details;
+
 =head1 NAME
 
 LedgerSMB::Report::Taxform::Details - 1099 and similar details forms for
@@ -10,8 +13,8 @@ LedgerSMB
 
 =cut
 
-package LedgerSMB::Report::Taxform::Details;
 use Moose;
+use namespace::autoclean;
 extends 'LedgerSMB::Report';
 with 'LedgerSMB::Report::Dates';
 
@@ -86,11 +89,11 @@ sub columns {
 
      { col_id  => 'acc_sum',
        type    => 'text',
-       name    => LedgerSMB::Report::text('Acc_trans Sum') },
+       name    => LedgerSMB::Report::text('Ledger sum') },
 
      { col_id  => 'invoice_sum',
        type    => 'text',
-       name    => LedgerSMB::Report::text('Invoice Sum') },
+       name    => LedgerSMB::Report::text('Invoice sum') },
 
      { col_id  => 'total',
        type    => 'text',
@@ -148,10 +151,10 @@ sub run_report {
     for my $row(@rows){
        $row->{total} = $row->{acc_total} + $row->{invoice_total};
     }
-    $self->rows(\@rows);
+    return $self->rows(\@rows);
 }
 
-=head1 COPYRIGHT
+=head1 LICENSE AND COPYRIGHT
 
 COPYRIGHT(C) 2013 The LedgerSMB Core Team.  This file may be used under the
 terms of the GNU General Public License version 2 or at your option any later

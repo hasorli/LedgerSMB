@@ -10,6 +10,9 @@ LedgerSMB::FileFormats::ISO20022::CAMT053 - Parse SEPA CAMT053 files
 
 =head1 SYNOPSIS
 
+    LedgerSMB::FileFormats::ISO20022::CAMT053->new($filename);
+    LedgerSMB::FileFormats::ISO20022::CAMT053->new($filecontents);
+
 =head1 DESCRIPTION
 
 This module provides basic management functions for CAMT053 files for LedgerSMB
@@ -18,22 +21,14 @@ This module provides basic management functions for CAMT053 files for LedgerSMB
 
 The constructor returns UNDEF if the file is not a CAMT053 docuent.
 
-=head1 CONSTRUCTOR
-
-you can pass in any specification of XML used by XML::Simple's XMLin mthod.
-
-Specifically you can pass in a file name, an undef (always returns undef), or an
-IO::Handle object.
+=head1 METHODS
 
 =head2 new($spec)
 
-Examples of constructor usage:
+You can pass in any input type specified by XML::Simple's XMLin method.
 
-    LedgerSMB::FileFormats::ISO20022::CAMT053->new($filename);
-    LedgerSMB::FileFormats::ISO20022::CAMT053->new($filecontents);
-
-Please note:  XML fragments are NOT SUPPORTED.  The XML tag MUST be a part of
-the contents or else the constructor will abort and return undef.
+Specifically you can pass in a file name, an undef (always returns undef), or an
+IO::Handle object.
 
 =cut
 
@@ -42,7 +37,7 @@ sub new{
     return unless defined $spec;
     my $raw = XMLin($spec);
     return unless $raw->{xmlns} and $raw->{xmlns} eq 'urn:iso:std:iso:20022:tech:xsd:camt.053.001.02';
-    bless ({struct => $raw}, $class);
+    return bless ({struct => $raw}, $class);
 }
 
 =head1 PROPERTIES
@@ -97,7 +92,8 @@ sub _decode_crdt {
     my ($code) = @_;
     die "bad debit/credit code: $code"
           unless lc($code) =~ /^(crdt|dbit)$/;
-    my $ret = 'credit' if lc($code) eq 'crdt';
+    my $ret;
+    $ret = 'credit' if lc($code) eq 'crdt';
     return $ret // 'debit';
 }
 
@@ -114,5 +110,15 @@ sub lineitems_simple {
         }
     } $self->lineitems_full;
 }
+
+=head1 LICENSE AND COPYRIGHT
+
+Copyright (C) 2016-2018 The LedgerSMB Core Team
+
+This file is licensed under the Gnu General Public License version 2, or at your
+option any later version.  A copy of the license should have been included with
+your software.
+
+=cut
 
 1;

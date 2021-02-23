@@ -1,11 +1,20 @@
+
+package LedgerSMB::PGNumber;
+
 =head1 NAME
 
 LedgerSMB::PGNumber - Number handling and serialization to database
 
+=head1 DESCRIPTION
+
+This is a wrapper class for handling a database interface for numeric (int,
+float, numeric) data types to/from the database and to/from user input.
+
+This extends PGObject::Type::BigFloat which further extends
+Math::BigFloat and can be used in this way.
+
 =cut
 
-
-package LedgerSMB::PGNumber;
 # try using the GMP library for Math::BigFloat for speed
 use Math::BigFloat try => 'GMP';
 use base qw(PGObject::Type::BigFloat);
@@ -13,19 +22,18 @@ use strict;
 use warnings;
 use Number::Format;
 use LedgerSMB::Setting;
+use LedgerSMB::Magic qw( DEFAULT_NUM_PREC );
 
-PGObject->register_type(pg_type => $_,
-                                  perl_class => __PACKAGE__)
-   for ('float4', 'float8', 'double precision', 'float', 'numeric');
+__PACKAGE__->register(registry => 'default',
+    types => [qw(float4 float8 float numeric), 'double precision']);
 
+our ($accuracy, $precision, $round_mode, $div_scale);
 
-=head1 SYNPOSIS
-
-This is a wrapper class for handling a database interface for numeric (int,
-float, numeric) data types to/from the database and to/from user input.
-
-This extends PBObject::Type::BigFloat which further extends LedgerSMB::PGNumber and
-can be used in this way.
+# Globals
+$accuracy = PGObject::Type::BigFloat->accuracy();
+$precision = PGObject::Type::BigFloat->precision();
+$round_mode = PGObject::Type::BigFloat->round_mode();
+$div_scale = PGObject::Type::BigFloat->div_scale();
 
 =head1 INHERITS
 
@@ -47,7 +55,7 @@ can be used in this way.
 
 =cut
 
-use overload "bool" => "_bool";
+use overload 'bool' => '_bool';
 
 # function to return boolean value based on the numerical value
 # of the BigFloat (zero being false)
@@ -81,15 +89,14 @@ sub _bool {
 =cut
 
 our $lsmb_formats = {
-      "1000.00" => { thousands_sep => '',  decimal_sep => '.' },
-
-      "1000,00" => { thousands_sep => '',  decimal_sep => ',' },
-     "1 000.00" => { thousands_sep => ' ', decimal_sep => '.' },
-     "1 000,00" => { thousands_sep => ' ', decimal_sep => ',' },
-     "1,000.00" => { thousands_sep => ',', decimal_sep => '.' },
-     "1.000,00" => { thousands_sep => '.', decimal_sep => ',' },
-     "1'000,00" => { thousands_sep => "'", decimal_sep => ',' },
-     "1'000.00" => { thousands_sep => "'", decimal_sep => '.' },
+       '1000.00' => { thousands_sep => '',   decimal_sep => '.' },
+       '1000,00' => { thousands_sep => '',   decimal_sep => ',' },
+      '1 000.00' => { thousands_sep => ' ',  decimal_sep => '.' },
+      '1 000,00' => { thousands_sep => ' ',  decimal_sep => ',' },
+      '1,000.00' => { thousands_sep => ',',  decimal_sep => '.' },
+      '1.000,00' => { thousands_sep => '.',  decimal_sep => ',' },
+     q{1'000,00} => { thousands_sep => q{'}, decimal_sep => ',' },
+     q{1'000.00} => { thousands_sep => q{'}, decimal_sep => '.' },
 
 };
 
@@ -126,7 +133,7 @@ my $lsmb_neg_formats = {
 
 =back
 
-=head1 IO METHODS
+=head1 METHODS
 
 =over
 
@@ -139,39 +146,41 @@ The input is formatted.
 sub from_input {
     my $self = shift;
     my $string = shift;
-    { # pre-5.14 compatibility block
-        local ($@); # pre-5.14, do not die() in this block
-        return $string if eval { $string->isa(__PACKAGE__) };
-    }
+
+    local $@ = undef;
+    return $string if eval { $string->isa(__PACKAGE__) };
+
     #tshvr4 avoid 'Use of uninitialized value $string in string eq'
-    if(!defined $string || $string eq ''){
-     return undef;
+    if (!defined $string || $string eq '') {
+        return undef;
     }
-    #$string = undef if $string eq '';
-    my %args   = (ref($_[0]) eq 'HASH')? %{$_[0]}: @_;
+    my %args   = (ref($_[0]) eq 'HASH') ? %{$_[0]} : @_;
     my $format = ($args{format}) ? $args{format}
-                              : $LedgerSMB::App_State::User->{numberformat};
+                                 : $LedgerSMB::App_State::User->{numberformat};
     die 'LedgerSMB::PGNumber No Format Set' if !$format;
     #return undef if !defined $string;
     my $negate;
     my $pgnum;
     my $newval;
     $negate = 1 if $string =~ /(^\(|DR$)/;
-    if ( UNIVERSAL::isa( $string, 'LedgerSMB::PGNumber' ) )
-    {
+
+    if (UNIVERSAL::isa($string, 'LedgerSMB::PGNumber')) {
         return $string;
     }
-    if (UNIVERSAL::isa( $string, 'LedgerSMB::PGNumber' ) ) {
+
+    if (UNIVERSAL::isa($string, 'LedgerSMB::PGNumber')) {
         $pgnum = $string;
-    } else {
-        my $formatter = new Number::Format(
-                    -thousands_sep => $lsmb_formats->{$format}->{thousands_sep},
-                    -decimal_point => $lsmb_formats->{$format}->{decimal_sep},
+    }
+    else {
+        my $formatter = Number::Format->new(
+            -thousands_sep => $lsmb_formats->{$format}->{thousands_sep},
+            -decimal_point => $lsmb_formats->{$format}->{decimal_sep},
         );
         $newval = $formatter->unformat_number($string);
         $pgnum = LedgerSMB::PGNumber->new($newval);
         $self->round_mode('+inf');
     }
+
     bless $pgnum, $self;
     $pgnum->bmul(-1) if $negate;
     die 'LedgerSMB::PGNumber Invalid Number' if $pgnum->is_nan();
@@ -223,13 +232,13 @@ sub to_output {
     my $dplaces = $places;
     $places = 0 unless defined $places and ($places > 0);
     my $zfill = ($places > 0) ? 1 : 0;
-    $dplaces = 5 unless defined $dplaces;
-    my $formatter = new Number::Format(
+    $dplaces = DEFAULT_NUM_PREC  unless defined $dplaces;
+    my $formatter = Number::Format->new(
         -thousands_sep => $lsmb_formats->{$format}->{thousands_sep},
         -decimal_point => $lsmb_formats->{$format}->{decimal_sep},
         -decimal_fill => $zfill,
         -neg_format => 'x'
-        );
+    );
     $str = $formatter->format_number($str, $dplaces);
 
     my $neg_format = ($args{neg_format}) ? $args{neg_format} : 'def';
@@ -250,13 +259,17 @@ sub to_sort {
     return $_[0]->bstr;
 }
 
-1;
-
 =back
 
-=head1 Copyright (C) 2011, The LedgerSMB core team.
+=head1 LICENSE AND COPYRIGHT
+
+Copyright (C) 2011-2018 The LedgerSMB Core Team
 
 This file is licensed under the Gnu General Public License version 2, or at your
 option any later version.  A copy of the license should have been included with
 your software.
 
+=cut
+
+
+1;

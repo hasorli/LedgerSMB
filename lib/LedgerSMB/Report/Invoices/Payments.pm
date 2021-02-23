@@ -1,3 +1,6 @@
+
+package LedgerSMB::Report::Invoices::Payments;
+
 =head1 NAME
 
 LedgerSMB::Report::Invoices::Payments - Payment Search Report for LedgerSMB
@@ -9,8 +12,8 @@ LedgerSMB::Report::Invoices::Payments - Payment Search Report for LedgerSMB
 
 =cut
 
-package LedgerSMB::Report::Invoices::Payments;
 use Moose;
+use namespace::autoclean;
 extends 'LedgerSMB::Report';
 with 'LedgerSMB::Report::Dates';
 
@@ -221,8 +224,8 @@ Runs the report and sets $self->rows
 sub run_report{
     my ($self) = @_;
     die LedgerSMB::Report::text('Must have cash account in batch')
-        if $self->batch_id and !defined $self->cash_accno;
-    $ENV{LSMB_ALWAYS_MONEY} = 1;
+        if $self->batch_id and not defined $self->cash_accno;
+    local $ENV{LSMB_ALWAYS_MONEY} = 1;
     my @rows = $self->call_dbmethod(funcname => 'payment__search');
     my $count = 1;
     for my $r(@rows){
@@ -238,11 +241,12 @@ sub run_report{
        class => 'submit',
        value => 'reverse_payments',
     }]) if $self->batch_id;
+    return;
 }
 
 =back
 
-=head1 COPYRIGHT
+=head1 LICENSE AND COPYRIGHT
 
 =cut
 

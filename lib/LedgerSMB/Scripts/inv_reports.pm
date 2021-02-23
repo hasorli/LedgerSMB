@@ -1,3 +1,6 @@
+
+package LedgerSMB::Scripts::inv_reports;
+
 =head1 NAME
 
 LedgerSMB::Scripts::inv_reports - Inventory Reports in LedgerSMB
@@ -10,6 +13,10 @@ LedgerSMB::Scripts::inv_reports - Inventory Reports in LedgerSMB
 
 This provides the general inventory reports for LedgerSMB.
 
+=head1 METHODS
+
+This module doesn't specify any methods.
+
 =head1 ROUTINES
 
 =over
@@ -19,8 +26,6 @@ This provides the general inventory reports for LedgerSMB.
 Searches for inventory adjustment reports
 
 =cut
-
-package LedgerSMB::Scripts::inv_reports;
 
 use strict;
 use warnings;
@@ -33,7 +38,7 @@ sub search_adj{
     my ($request) = @_;
     my $rpt = LedgerSMB::Report::Inventory::Search_Adj->new(%$request);
     $rpt->run_report;
-    return $rpt->render_to_psgi($request);
+    return $rpt->render($request);
 }
 
 =item adj_detail
@@ -47,7 +52,7 @@ sub adj_detail {
     $request->{hiddens} = { id => $request->{id}};
     my $rpt = LedgerSMB::Report::Inventory::Adj_Details->new(%$request);
     $rpt->run_report;
-    return $rpt->render_to_psgi($request);
+    return $rpt->render($request);
 }
 
 =item approve
@@ -61,7 +66,7 @@ sub approve {
     my $rpt = LedgerSMB::Report::Inventory::Adj_Details->new(%$request);
     $rpt->approve;
     $request->{report_name} = 'inventory_adj';
-    LedgerSMB::Scripts::reports::start_report($request);
+    return LedgerSMB::Scripts::reports::start_report($request);
 }
 
 =item delete
@@ -75,12 +80,12 @@ sub delete {
     my $rpt = LedgerSMB::Report::Inventory::Adj_Details->new(%$request);
     $rpt->delete;
     $request->{report_name} = 'inventory_adj';
-    LedgerSMB::Scripts::reports::start_report($request);
+    return LedgerSMB::Scripts::reports::start_report($request);
 }
 
 =back
 
-=head1 COPYRIGHT
+=head1 LICENSE AND COPYRIGHT
 
 COPYRIGHT (C) 2012 The LedgerSMB Core Team.  This file may be re-used under the
 terms of the LedgerSMB General Public License version 2 or at your option any

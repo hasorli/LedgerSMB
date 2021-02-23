@@ -1,131 +1,101 @@
 
+package LedgerSMB::Template::HTML;
+
 =head1 NAME
 
 LedgerSMB::Template::HTML - Template support module for LedgerSMB
+
+=head1 DESCRIPTION
+
+Implements C<LedgerSMB::Template>'s FORMATTER protocol for HTML output.
 
 =head1 METHODS
 
 =over
 
-=item get_template ($name)
-
-Returns the appropriate template filename for this format.
-
-=item preprocess ($vars)
-
-This method returns a reference to a hash that contains a copy of the passed
-hashref's data with HTML entities converted to escapes.
-
-=item process ($parent, $cleanvars)
-
-Processes the template for HTML.
-
-=item postprocess ($parent)
-
-Currently does nothing.
-
-=item escape($string)
-
-Escapes a scalar string and returns the sanitized version.
-
-=back
-
-=head1 Copyright (C) 2007, The LedgerSMB core team.
-
-This work contains copyrighted information from a number of sources all used
-with permission.
-
-It is released under the GNU General Public License Version 2 or, at your
-option, any later version.  See COPYRIGHT file for details.  For a full list
-including contact information of contributors, maintainers, and copyright
-holders, see the CONTRIBUTORS file.
 =cut
-
-package LedgerSMB::Template::HTML;
 
 use strict;
 use warnings;
 
-use Template;
-use Template::Parser;
-use LedgerSMB::Template::TTI18N;
-use CGI::Simple::Standard qw(:html);
+use HTML::Entities;
+use HTML::Escape;
 use LedgerSMB::Sysconfig;
-use LedgerSMB::Company_Config;
 use LedgerSMB::App_State;
 
 my $binmode = ':utf8';
 my $extension = 'html';
 
-sub get_template {
-    my $name = shift;
-    return "${name}.$extension";
-}
+=item escape($string)
 
-sub preprocess {
-    my $rawvars = shift;
-    return LedgerSMB::Template::_preprocess($rawvars, \&escape);
-}
+Escapes a scalar string and returns the sanitized version.
+
+=cut
 
 sub escape {
     my $vars = shift @_;
     return undef unless defined $vars;
-    $vars = escapeHTML($vars);
+    $vars = escape_html($vars);
     return $vars;
 }
 
-sub process {
-    my $parent = shift;
-    my $cleanvars = shift;
+=item unescape($string)
 
-    $parent->{binmode} = $binmode;
+Apply the reverse transformation of C<escape> to <$string>.
 
-    my $dojo_theme;
-    if ($LedgerSMB::App_State::DBH){
-        local ($@); # pre-5.14, do not die() in this block
-        eval { LedgerSMB::Company_Config->initialize()
-                   unless $LedgerSMB::App_State::Company_Config;
-               $dojo_theme =
-                   $LedgerSMB::App_State::Company_Config->{dojo_theme};
-        }; # eval required to make setup.pl work as advertised
-    }
-    $dojo_theme ||= $LedgerSMB::Sysconfig::dojo_theme;
-    $cleanvars->{dojo_theme} ||= $dojo_theme;
-    $cleanvars->{dojo_built} ||= $LedgerSMB::Sysconfig::dojo_built;
-    $cleanvars->{UNESCAPE} = sub { return unescapeHTML(shift @_) };
+=cut
 
-    my $output = '';
-    if ($parent->{outputfile}) {
-        if (ref $parent->{outputfile}){
-            $output = $parent->{outputfile};
-        } else {
-            $output = "$parent->{outputfile}.$extension";
-        }
-    } else {
-        $output = \$parent->{output};
-    }
-    my $arghash = $parent->get_template_args($extension,$binmode,1);
-    my $template = Template->new($arghash) || die Template->error();
-    unless ($template->process(
-                $parent->get_template_source(\&get_template),
-                {
-                    %$cleanvars,
-                    %$LedgerSMB::Template::TTI18N::ttfuncs,
-                    'escape' => \&preprocess
-                },
-                $output,
-                {binmode => $binmode})
-    ){
-        my $err = $template->error();
-        die "Template error: $err" if $err;
-    }
-    $parent->{mimetype} = 'text/' . $extension;
+sub unescape {
+    return decode_entities(shift @_);
 }
+
+=item setup($parent, $cleanvars, $output)
+
+Implements the template's initialization protocol.
+
+=cut
+
+sub setup {
+    my ($parent, $cleanvars, $output) = @_;
+
+    return ($output, {
+        input_extension => $extension,
+        binmode => $binmode,
+    });
+}
+
+=item postprocess($parent, $output, $config)
+
+Implements the template's post-processing protocol.
+
+=cut
 
 sub postprocess {
-    my $parent = shift;
-    $parent->{rendered} = "$parent->{outputfile}.$extension" if $parent->{outputfile};
-    return $parent->{rendered};
+    my ($parent, $output, $config) = @_;
+    return undef;
 }
+
+=item mimetype()
+
+Returns the rendered template's mimetype.
+
+=cut
+
+sub mimetype {
+    my $config = shift;
+    return 'text/' . $extension;
+}
+
+=back
+
+=head1 LICENSE AND COPYRIGHT
+
+Copyright (C) 2007-2018 The LedgerSMB Core Team
+
+This file is licensed under the Gnu General Public License version 2, or at your
+option any later version.  A copy of the license should have been included with
+your software.
+
+=cut
 
 1;

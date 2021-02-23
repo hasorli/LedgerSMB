@@ -1,3 +1,6 @@
+
+package LedgerSMB::Report::PNL::Product;
+
 =head1 NAME
 
 LedgerSMB::Report::PNL::Product - Profit/Loss reports on Products
@@ -19,8 +22,8 @@ real way to track revenue vs loss, for example with the case of resold services.
 
 =cut
 
-package LedgerSMB::Report::PNL::Product;
 use Moose;
+use namespace::autoclean;
 extends 'LedgerSMB::Report::PNL';
 
 =head1 CRITERIA PROPERTIES
@@ -121,7 +124,7 @@ sub report_base {
 
 =back
 
-=head1 COPYRIGHT
+=head1 LICENSE AND COPYRIGHT
 
 COPYRIGHT (C) 2012 The LedgerSMB Core Team.  This file may be re-used under the
 terms of the LedgerSMB General Public License version 2 or at your option any
@@ -129,4 +132,5 @@ later version.  Please see enclosed LICENSE file for details.
 
 =cut
 
+__PACKAGE__->meta->make_immutable;
 1;

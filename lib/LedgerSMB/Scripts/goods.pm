@@ -1,10 +1,21 @@
+
+package LedgerSMB::Scripts::goods;
+
 =head1 NAME
 
 LedgerSMB::Scripts::goods - Goods and Services workflows for LedgerSMB
 
-=cut
+=head1 DESCRIPTION
 
-package LedgerSMB::Scripts::goods;
+Implements the goods search, parts groups, price groups and
+inventory activity screens.
+
+=head1 SYNOPSIS
+
+ LedgerSMB::Scripts::goods::search_screen($request);
+ LedgerSMB::Scripts::goods::search($request);
+
+=cut
 
 use strict;
 use warnings;
@@ -17,12 +28,7 @@ use LedgerSMB::Report::Inventory::Partsgroups;
 use LedgerSMB::Report::Inventory::Pricegroups;
 use LedgerSMB::Report::Inventory::Activity;
 
-=head1 SYNOPSIS
-
- LedgerSMB::Scripts::goods::search_screen($request);
- LedgerSMB::Scripts::goods::search($request);
-
-=head1 Routines
+=head1 METHODS
 
 =over
 
@@ -32,7 +38,7 @@ use LedgerSMB::Report::Inventory::Activity;
 
 sub search_screen {
     my ($request) = @_;
-    $request->{partsgroups} = $request->call_procedure(
+    @{$request->{partsgroups}} = $request->call_procedure(
        funcname => 'partsgroup__search', args => [undef]
     );
     $request->{report_name} = 'search_goods';
@@ -52,8 +58,8 @@ sub search {
                if ($request->{"inc_$_"});
     }
     my $report = LedgerSMB::Report::Inventory::Search->new(%$request);
-    return $report->render_to_psgi($request);
-};
+    return $report->render($request);
+}
 
 =item search_partsgroups
 
@@ -65,7 +71,7 @@ for a prefix search
 sub search_partsgroups {
     my ($request) = @_;
     my $report = LedgerSMB::Report::Inventory::Partsgroups->new(%$request);
-    return $report->render_to_psgi($request);
+    return $report->render($request);
 }
 
 =item search_pricegroups
@@ -78,7 +84,7 @@ for a prefix search
 sub search_pricegroups {
     my ($request) = @_;
     my $report = LedgerSMB::Report::Inventory::Pricegroups->new(%$request);
-    return $report->render_to_psgi($request);
+    return $report->render($request);
 }
 
 =item inventory_activity
@@ -90,7 +96,7 @@ This routine runs the inventory activity report/
 sub inventory_activity {
     my ($request) = @_;
     my $report = LedgerSMB::Report::Inventory::Activity->new(%$request);
-    return $report->render_to_psgi($request);
+    return $report->render($request);
 }
 
 =item cogs_lines
@@ -102,12 +108,12 @@ Runs the cogs lines report.
 sub cogs_lines {
     my ($request) = shift;
     return LedgerSMB::Report::Invoices::COGS->new(%$request)
-        ->render_to_psgi($request);
+        ->render($request);
 }
 
 =back
 
-=head1 COPYRIGHT
+=head1 LICENSE AND COPYRIGHT
 
 COPYRIGHT (C) 2012 The LedgerSMB Core Team.  This file may be re-used under the
 terms of the LedgerSMB General Public License version 2 or at your option any

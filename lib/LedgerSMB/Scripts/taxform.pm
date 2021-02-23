@@ -1,8 +1,11 @@
+
+package LedgerSMB::Scripts::taxform;
+
 =head1 NAME
 
 LedgerSMB::Scripts::taxform - LedgerSMB handler for reports on tax forms.
 
-=head1 SYNOPSIS
+=head1 DESCRIPTION
 
 Implement the ability to do end-of-year reporting on vendors as to how
 much was recorded as reportable.
@@ -16,12 +19,9 @@ information depending on what one clicks.
 
 =cut
 
-package LedgerSMB::Scripts::taxform;
-
 use strict;
 use warnings;
 
-use LedgerSMB;
 use LedgerSMB::Company_Config;
 use LedgerSMB::Template;
 use LedgerSMB::DBObject::TaxForm;
@@ -78,7 +78,7 @@ sub _taxform_screen
         template => 'taxform/add_taxform',
         format => 'HTML'
     );
-    return $template->render_to_psgi($taxform);
+    return $template->render($taxform);
 }
 
 sub add_taxform {
@@ -93,7 +93,7 @@ This retrieves and edits a tax form.  Requires that id be set.
 
 sub edit {
     my ($request) = @_;
-    my $tf = LedgerSMB::DBObject::TaxForm->get($request->{id});
+    my $tf = LedgerSMB::DBObject::TaxForm->new(%$request)->get($request->{id});
     $request->merge($tf);
     return _taxform_screen($request);
 }
@@ -142,7 +142,7 @@ sub generate_report {
     die $LedgerSMB::App_State::Locale->text('No tax form selected')
         unless $request->{tax_form_id};
     my $report = _generate_report($request);
-    return $report->render_to_psgi($request);
+    return $report->render($request);
 }
 
 =item save
@@ -201,7 +201,7 @@ sub print {
           template => 'taxform/summary_report',
           format => 'PDF',
     );
-    return $template->render_to_psgi($request);
+    return $template->render($request);
 }
 
 =item list_all
@@ -213,19 +213,35 @@ Lists all tax forms.
 sub list_all {
     my $request= shift;
     my $report = LedgerSMB::Report::Taxform::List->new(%$request);
-    return $report->render_to_psgi($request);
+    return $report->render($request);
 }
 
 =back
 
-=head1 Copyright (C) 2010 The LedgerSMB Core Team
+=cut
 
-Licensed under the GNU General Public License version 2 or later (at your
-option).  For more information please see the included LICENSE and COPYRIGHT
-files.
+{
+    local ($!, $@) = (undef, undef);
+    my $do_ = 'scripts/custom/taxform.pl';
+    if ( -e $do_ ) {
+        unless ( do $do_ ) {
+            if ($! or $@) {
+                warn "\nFailed to execute $do_ ($!): $@\n";
+                die (  "Status: 500 Internal server error (taxform.pm)\n\n" );
+            }
+        }
+    }
+};
+
+=head1 LICENSE AND COPYRIGHT
+
+Copyright (C) 2010-2018 The LedgerSMB Core Team
+
+This file is licensed under the Gnu General Public License version 2, or at your
+option any later version.  A copy of the license should have been included with
+your software.
 
 =cut
 
-###TODO-LOCALIZE-DOLLAR-AT
-eval { do "scripts/custom/taxform.pl"};
+
 1;

@@ -1,8 +1,11 @@
+
+package LedgerSMB::Report::Trial_Balance;
+
 =head1 NAME
 
 LedgerSMB::Report::Trial_Balance - Trial Balance report for LedgerSMB
 
-=head1 SYNOPSYS
+=head1 SYNOPSIS
 
 Unlike other reports, trial balance reports can be saved:
 
@@ -22,8 +25,8 @@ We can also retrieve a previous report from the database and run it:
 
 =cut
 
-package LedgerSMB::Report::Trial_Balance;
 use Moose;
+use namespace::autoclean;
 use LedgerSMB::App_State;
 extends 'LedgerSMB::Report';
 with 'LedgerSMB::Report::Dates', 'LedgerSMB::Report::Approval_Option';
@@ -232,10 +235,10 @@ sub run_report {
         next if ! $self->all_accounts
                 && (($ref->{starting_balance} == 0)
                     and ($ref->{credits} == 0) and ($ref->{debits} == 0));
-        my $href_suffix = "&accno=" . $ref->{account_number};
-        $href_suffix .= "&from_date=" . $self->from_date->to_db
+        my $href_suffix = '&accno=' . $ref->{account_number};
+        $href_suffix .= '&from_date=' . $self->from_date->to_db
               if defined $self->from_date;
-        $href_suffix .= "&to_date=" . $self->to_date->to_db
+        $href_suffix .= '&to_date=' . $self->to_date->to_db
               if defined $self->to_date;
 
         $total_debits += $ref->{debits};
@@ -249,12 +252,13 @@ sub run_report {
                debits => $total_debits,
               credits => $total_credits,
             html_class => 'listtotal'};
-    $self->rows(\@rows);
+
+    return $self->rows(\@rows);
 }
 
 =back
 
-=head1 COPYRIGHT
+=head1 LICENSE AND COPYRIGHT
 
 COPYRIGHT (C) 2012 The LedgerSMB Core Team.  This file may be re-used under the
 terms of the LedgerSMB General Public License version 2 or at your option any

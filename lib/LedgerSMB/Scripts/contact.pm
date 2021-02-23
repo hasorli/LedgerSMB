@@ -1,20 +1,19 @@
 
-=pod
+
+package LedgerSMB::Scripts::contact;
 
 =head1 NAME
 
 LedgerSMB::Scripts::contact - LedgerSMB class defining the Controller
 functions, template instantiation and rendering for customer editing and display.
 
-=head1 SYOPSIS
+=head1 DESCRIPTION
 
 This module is the UI controller for the customer, vendor, etc functions; it
 
 =head1 METHODS
 
 =cut
-
-package LedgerSMB::Scripts::contact;
 
 use strict;
 use warnings;
@@ -32,12 +31,13 @@ use LedgerSMB::Entity::Bank;
 use LedgerSMB::Entity::Note;
 use LedgerSMB::Entity::User;
 use LedgerSMB::File;
+use LedgerSMB::Magic qw( EC_EMPLOYEE );
 use LedgerSMB::App_State;
 use LedgerSMB::Setting;
 use LedgerSMB::Template;
 use Try::Tiny;
 
-use LedgerSMB::old_code;
+use LedgerSMB::old_code qw(dispatch);
 
 #Plugins
 opendir(my $dh, 'lib/LedgerSMB/Entity/Plugins')
@@ -46,11 +46,21 @@ my @pluginmods = grep { /^[^.]/ && -f "LedgerSMB/Entity/Plugins/$_" } readdir($d
 closedir $dh;
 
 for (@pluginmods){
-  do "lib/LedgerSMB/Entity/Plugins/$_";
+    local $! = undef;
+    local $@ = undef;
+    my $do_ = "lib/LedgerSMB/Entity/Plugins/$_";
+    if ( -e $do_ ) {
+        unless ( do $do_ ) {
+            if ($! or $@) {
+                warn "\nFailed to execute $do_ ($!): $@\n";
+                die ( "Status: 500 Internal server error (contact.pm)\n\n" );
+            }
+        }
+    }
 }
 
 
-=head1 COPYRIGHT
+=head1 LICENSE AND COPYRIGHT
 
 Copyright (c) 2012, the LedgerSMB Core Team.  This is licensed under the GNU
 General Public License, version 2, or at your option any later version.  Please
@@ -71,7 +81,7 @@ control code
 
 sub get_by_cc {
     my ($request) = @_;
-    if ($request->{entity_class} == 3){
+    if ($request->{entity_class} == EC_EMPLOYEE){
         my $emp = LedgerSMB::Entity::Person::Employee->get_by_cc(
                             $request->{control_code}
         );
@@ -81,14 +91,14 @@ sub get_by_cc {
            LedgerSMB::Entity::Company->get_by_cc($request->{control_code});
     $entity ||=  LedgerSMB::Entity::Person->get_by_cc($request->{control_code});
     my ($company, $person) = (undef, undef);
-    { # pre-5.14 compatibility block
-        local ($@); # pre-5.14, do not die() in this block
-        if (eval {$entity->isa('LedgerSMB::Entity::Company')}){
-            $company = $entity;
-        } elsif (eval {$entity->isa('LedgerSMB::Entity::Person')}){
-            $person = $entity;
-        }
+
+    local $@ = undef;
+    if (eval {$entity->isa('LedgerSMB::Entity::Company')}){
+        $company = $entity;
+    } elsif (eval {$entity->isa('LedgerSMB::Entity::Person')}){
+        $person = $entity;
     }
+
     return _main_screen($request, $company, $person);
 }
 
@@ -105,7 +115,7 @@ of the company information.
 
 sub get {
     my ($request) = @_;
-    if ($request->{entity_class} && $request->{entity_class} == 3){
+    if ($request->{entity_class} && $request->{entity_class} == EC_EMPLOYEE){
         my $emp = LedgerSMB::Entity::Person::Employee->get(
                           $request->{entity_id}
         );
@@ -114,14 +124,14 @@ sub get {
     my $entity = LedgerSMB::Entity::Company->get($request->{entity_id});
     $entity ||= LedgerSMB::Entity::Person->get($request->{entity_id});
     my ($company, $person) = (undef, undef);
-    { # pre-5.14 compatibility block
-        local ($@); # pre-5.14, do not die() in this block
-        if (eval {$entity->isa('LedgerSMB::Entity::Company')}){
-            $company = $entity;
-        } elsif (eval {$entity->isa('LedgerSMB::Entity::Person')}){
-            $person = $entity;
-        }
+
+    local $@ = undef;
+    if (eval {$entity->isa('LedgerSMB::Entity::Company')}){
+        $company = $entity;
+    } elsif (eval {$entity->isa('LedgerSMB::Entity::Person')}){
+        $person = $entity;
     }
+
     return _main_screen($request, $company, $person);
 }
 
@@ -144,8 +154,8 @@ sub _main_screen {
        @DIVS = qw(credit address contact_info bank_act notes files);
        unshift @DIVS, 'company' if $company->{entity_id};
        unshift @DIVS, 'person' if $person->{entity_id};
-       no warnings 'uninitialized';
-       if ($person->{entity_id} && $person->{entity_class} == 3){
+       if ($person->{entity_id} && $person->{entity_class}
+                && $person->{entity_class} == EC_EMPLOYEE ){
           shift @DIVS;
           unshift @DIVS, 'employee', 'user', 'wage';
        }
@@ -155,7 +165,8 @@ sub _main_screen {
        my $employee = LedgerSMB::Entity::Person::Employee->get($entity_id);
        $person = $employee if $employee;
        $user = LedgerSMB::Entity::User->get($entity_id);
-    } elsif (defined $person->{entity_class} && $person->{entity_class} == 3) {
+    } elsif (defined $person->{entity_class}
+                && $person->{entity_class} == EC_EMPLOYEE ) {
        @DIVS = ('employee');
     } else {
        @DIVS = qw(company person);
@@ -263,7 +274,7 @@ sub _main_screen {
 
     for my $var (\@ar_ap_acc_list, \@cash_acc_list, \@discount_acc_list){
         for my $ref (@$var){
-            $ref->{description} ||= "";
+            $ref->{description} ||= '';
             $ref->{text} = "$ref->{accno}--$ref->{description}";
         }
     }
@@ -277,7 +288,7 @@ sub _main_screen {
     }
 
     my @location_class_list =
-       grep { $_->{id} < 4 }
+       grep { $_->{class} =~ m/^(?:Billing|Sales|Shipping)$/ }
             LedgerSMB->call_procedure(funcname => 'location_list_class');
 
     my @business_types =
@@ -302,11 +313,11 @@ sub _main_screen {
          value => 3} if $credit_act->{id};
     ;
 
-    { # pre-5.14 compatibility block
-        local ($@); # pre-5.14, do not die() in this block
-        $request->close_form() if eval {$request->can('close_form')};
-        $request->open_form() if eval {$request->can('close_form')};
-    }
+
+    local $@ = undef;
+    $request->close_form() if eval {$request->can('close_form')};
+    $request->open_form() if eval {$request->can('close_form')};
+
     opendir(my $dh2, 'UI/Contact/plugins') || die "can't opendir plugins directory: $!";
     my @plugins = grep { /^[^.]/ && -f "UI/Contact/plugins/$_" } readdir($dh2);
     closedir $dh2;
@@ -330,7 +341,7 @@ sub _main_screen {
     my $roles;
     $roles = $user->list_roles if $user;
 
-    return $template->render_to_psgi({
+    return $template->render({
                      DIVS => \@DIVS,
                 DIV_LABEL => \%DIV_LABEL,
              entity_class => $entity_class,
@@ -390,7 +401,7 @@ sub save_employee {
                            );
         ($request->{control_code}) = values %$ref;
     }
-    $request->{entity_class} = 3;
+    $request->{entity_class} = EC_EMPLOYEE ;
     $request->{ssn} = $request->{personal_id} if defined $request->{personal_id};
     $request->{control_code} = $request->{employeenumber} if defined $request->{employeenumber};
     $request->{employeenumber} ||= $request->{control_code};
@@ -574,7 +585,7 @@ Saves a person and moves on to the next screen
 
 sub save_person {
     my ($request) = @_;
-    if ($request->{entity_class} == 3){
+    if ($request->{entity_class} == EC_EMPLOYEE ){
         $request->{dob} = $request->{birthdate} if $request->{birthdate};
        return save_employee($request);
     }
@@ -590,7 +601,7 @@ sub save_person {
     );
     $request->{target_div} = 'credit_div';
     $person->save;
-    _main_screen($request, undef, $person);
+    return _main_screen($request, undef, $person);
 }
 
 =item save_credit($request)
@@ -604,7 +615,6 @@ sub save_credit {
     my ($request) = @_;
     $request->{target_div} = 'credit_div';
     my $company;
-    my @taxes;
 
     if (!$request->{ar_ap_account_id}){
           $request->error(
@@ -827,7 +837,7 @@ sub get_pricelist {
                 format => uc($request->{format} || 'HTML'),
                 locale => $request->{_locale},
     );
-    return $template->render_to_psgi($request);
+    return $template->render($request);
 }
 
 
@@ -863,6 +873,7 @@ sub save_pricelist {
                       price => $request->{"lastcost_tfoot_$count"} ||
                                $request->{"sellprice_tfoot_$count"},
                    leadtime => $request->{"leadtime_tfoot_$count"},
+                        qty => $request->{"qty_tfoot_$count"},
          } if defined $part->{id};
     }
 
@@ -973,7 +984,7 @@ sub save_roles {
 
 =back
 
-=head1 COPYRIGHT
+=head1 LICENSE AND COPYRIGHT
 
 Copyright (c) 2012, the LedgerSMB Core Team.  This is licensed under the GNU
 General Public License, version 2, or at your option any later version.  Please

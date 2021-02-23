@@ -1,16 +1,24 @@
+
+package LedgerSMB::Scripts::parts;
+
 =head1 NAME
 
 LedgerSMB::Scripts::parts
 
+=head1 DESCRIPTION
+
+TODO.
+
+=head1 METHODS
+
+This module doesn't specify any methods.
+
 =cut
 
-package LedgerSMB::Scripts::parts;
 use strict;
 use warnings;
-use CGI::Simple;
 
 use LedgerSMB::Part;
-use LedgerSMB::REST_Format::json;
 
 =head1 FUNCTIONS
 
@@ -54,11 +62,19 @@ sub partslist_json {
         grep { ! $_->{obsolete} }
         map { $_->{label} = $_->{partnumber} . '--' . $_->{description}; $_ }
         @$items;
-    my $json = LedgerSMB::REST_Format::json->to_output($items);
 
-    return [ 200,
-             [ 'Content-Type' => 'application/json; charset=utf-8' ],
-             [ $json ] ];
+    return $request->to_json( $items );
 }
+
+
+=head1 LICENSE AND COPYRIGHT
+
+Copyright (C) 2015-2018 The LedgerSMB Core Team
+
+This file is licensed under the Gnu General Public License version 2, or at your
+option any later version.  A copy of the license should have been included with
+your software.
+
+=cut
 
 1;

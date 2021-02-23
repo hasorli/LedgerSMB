@@ -1,6 +1,14 @@
+
+package LedgerSMB::Report::Listings::Asset;
+
 =head1 NAME
 
 LedgerSMB::Report::Listings::Asset - Search Fixed Assets in LedgerSMB
+
+=head1 DESCRIPTION
+
+Implements a listing of individual assets from the fixed asset accounting
+subledger.
 
 =head1 SYNPOSIS
 
@@ -8,8 +16,8 @@ LedgerSMB::Report::Listings::Asset - Search Fixed Assets in LedgerSMB
 
 =cut
 
-package LedgerSMB::Report::Listings::Asset;
 use Moose;
+use namespace::autoclean;
 extends 'LedgerSMB::Report';
 use LedgerSMB::MooseTypes;
 
@@ -143,10 +151,10 @@ sub run_report {
     for my $r(@rows){
        $r->{row_id} = $r->{id};
     }
-    $self->rows(\@rows);
+    return $self->rows(\@rows);
 }
 
-=head1 COPYRIGHT
+=head1 LICENSE AND COPYRIGHT
 
 Copyright (C) 2014 The LedgerSMB Core Team
 

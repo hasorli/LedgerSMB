@@ -1,16 +1,18 @@
+
+package LedgerSMB::Entity::User;
+
 =head1 NAME
 
 LedgerSMB::Entity::User - User management Logic for LedgerSMB
 
-=cut
+=head1 DESCRIPTION
 
-package LedgerSMB::Entity::User;
-use Moose;
-use Try::Tiny;
-use LedgerSMB::App_State;
-with 'LedgerSMB::PGObject';
+Implements mapping to database routines for creating/getting/retrieving
+user information ("login accounts").
 
-=head1 SYNOPSYS
+Note that this class isn't derived from LedgerSMB::Entity.
+
+=head1 SYNOPSIS
 
 Resetting a password (expires in 24 hrs):
   my $user = LedgerSMB::Entity::User->get($entcity_id);
@@ -23,6 +25,14 @@ Creating a new user:
 Saving permissions:
   my $user = LedgerSMB::Entity::User->new(%$request);
   $user->save_roles($request);
+
+=cut
+
+use Moose;
+use namespace::autoclean;
+use Try::Tiny;
+use LedgerSMB::App_State;
+with 'LedgerSMB::PGObject';
 
 =head1 PROPERTIES
 
@@ -109,6 +119,7 @@ sub reset_password {
     my ($ref) = $self->call_dbmethod(
         funcname => 'admin__save_user',
         args => { password => $password });
+   return;
 }
 
 =item create
@@ -128,6 +139,7 @@ sub create {
             funcname => 'admin__add_user_to_role',
             args => [ $self->username, $role ]);
     }
+    return;
 }
 
 =item save_roles($role_list)
@@ -154,7 +166,7 @@ sub save_roles {
                                   args => [$self->{username}, $rol_name]);
         }
     }
-    $self->role_list($role_list);
+    return $self->role_list($role_list);
 }
 
 =item list_roles
@@ -176,7 +188,7 @@ sub list_roles {
 
 =back
 
-=head1 COPYRIGHT
+=head1 LICENSE AND COPYRIGHT
 
 Copyright (C) 2012 The LedgerSMB Core Team.  This file may be reused under the
 conditions of the GNU GPL v2 or at your option any later version.  Please see

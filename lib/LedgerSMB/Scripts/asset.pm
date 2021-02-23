@@ -1,10 +1,11 @@
-=pod
+
+package LedgerSMB::Scripts::asset;
 
 =head1 NAME
 
 LedgerSMB::Scripts::asset - web entry points for fixed assets accounting
 
-=head1 SYNPOSIS
+=head1 DESCRIPTION
 
 Asset Management workflow script
 
@@ -14,7 +15,7 @@ Asset Management workflow script
 
 =cut
 
-package LedgerSMB::Scripts::asset;
+use LedgerSMB::Magic qw( MONTHS_PER_YEAR  RC_PARTIAL_DISPOSAL RC_DISPOSAL );
 use LedgerSMB::Template;
 use LedgerSMB::DBObject::Asset_Class;
 use LedgerSMB::DBObject::Asset;
@@ -51,7 +52,7 @@ sub begin_depreciation_all {
         template => 'begin_depreciation_all',
         format => 'HTML'
     );
-    return $template->render_to_psgi({ request => $request });
+    return $template->render({ request => $request });
 }
 
 =item depreciate_all
@@ -83,7 +84,7 @@ sub depreciate_all {
         template => 'info',
         format => 'HTML'
     );
-    return $template->render_to_psgi({ request => $request });
+    return $template->render({ request => $request });
 }
 
 =item asset_category_screen
@@ -113,7 +114,7 @@ sub asset_category_screen {
         template => 'edit_class',
         format => 'HTML'
     );
-    return $template->render_to_psgi({ request => $request,
+    return $template->render({ request => $request,
                                        asset_class => $ac });
 }
 
@@ -149,7 +150,7 @@ sub asset_category_search {
     );
     my $ac = LedgerSMB::DBObject::Asset_Class->new();
     $ac->get_metadata;
-    return $template->render_to_psgi({ request => $request,
+    return $template->render({ request => $request,
                                        asset_class => $ac });
 }
 
@@ -162,7 +163,7 @@ Displays a list of all asset classes.  No inputs required.
 sub asset_category_results {
     my ($request) = @_;
     return LedgerSMB::Report::Listings::Asset_Class->new(%$request)
-        ->render_to_psgi($request);
+        ->render($request);
 }
 
 =item edit_asset_class
@@ -218,7 +219,7 @@ sub asset_screen {
         template => 'edit_asset',
         format => 'HTML'
     );
-    return $template->render_to_psgi({ request => $request,
+    return $template->render({ request => $request,
                                        asset => $asset });
 }
 
@@ -246,7 +247,7 @@ sub asset_search {
         template => 'search_asset',
         format => 'HTML'
     );
-    return $template->render_to_psgi({ request => $request,
+    return $template->render({ request => $request,
                                        asset => $asset });
 }
 
@@ -262,7 +263,7 @@ be set.
 sub asset_results {
     my ($request) = @_;
     return LedgerSMB::Report::Listings::Asset->new(%$request)
-        ->render_to_psgi($request);
+        ->render($request);
 }
 
 =item asset_save
@@ -315,7 +316,7 @@ sub new_report {
         template => 'begin_report',
         format => 'HTML'
     );
-    return $template->render_to_psgi({ request => $request,
+    return $template->render({ request => $request,
                                        report => $report });
 }
 
@@ -404,11 +405,11 @@ sub display_report {
    my $rows = [];
    my $hiddens = {};
    my $count = 0;
-   for my $asset (@{$request->{assets}}){
+   for my $asset (@{$report->{assets}}){
        push @$rows,
             { select         => {input => { name    => "asset_$count",
                                             checked => $asset->{checked},
-                                            type    => "checkbox",
+                                            type    => 'checkbox',
                                             value   => '1',
                                           },
                                 },
@@ -428,6 +429,12 @@ sub display_report {
                                             class => 'amount',
                                             value => $request->{"amount_$asset->{id}"},
                                             size  => 20,
+                                            # requiring proceeds works around
+                                            # a problem of NULL amounts ending
+                                            # up in the database, resulting in
+                                            # approval trying to post NULL into
+                                            # the amount field in the gl table
+                                            required => 1,
                                           },
                                 },
               percent        => {input => { name  => "percent_$asset->{id}",
@@ -457,7 +464,7 @@ sub display_report {
        push @$cols, 'dm', 'amount';
        $hiddens->{report_class} = $request->{report_class};
    }
-   if ($request->{report_class} == 4){
+   if ($request->{report_class} == RC_PARTIAL_DISPOSAL ){
        $request->{title} = $locale->text('Asset Partial Disposal Report');
        push @$cols, 'percent';
    }
@@ -473,7 +480,7 @@ sub display_report {
         template => 'form-dynatable',
         format => 'HTML'
     );
-    return $template->render_to_psgi({
+    return $template->render({
                         form => $request,
                      columns => $cols,
                      heading => $heading,
@@ -506,7 +513,7 @@ sub search_reports {
         template => 'begin_approval',
         format => 'HTML'
     );
-    return $template->render_to_psgi({ request => $request,
+    return $template->render({ request => $request,
                                        asset_report => $ar });
 }
 
@@ -538,9 +545,12 @@ sub report_results {
                      total => $locale->text('Total'),
     };
     my $rows = [];
-    my $hiddens = {};
+    my $hiddens = {
+        gain_acct => $request->{gain_acct},
+        loss_acct => $request->{loss_acct},
+    };
     my $count = 0;
-    my $base_href = "asset.pl?action=report_details&".
+    my $base_href = 'asset.pl?action=report_details&'.
                      "expense_acct=$ar->{expense_acct}";
     if ($ar->{depreciation}){
              $base_href .= '&depreciation=1';
@@ -550,16 +560,16 @@ sub report_results {
     }
     for my $r (@results){
         next if (($r->{report_class} != 1 and $ar->{depreciation})
-                 or ($r->{report_class} == 1 and !$ar->{depreciation}));
+                 or ($r->{report_class} == 1 and not $ar->{depreciation}));
         $hiddens->{"id_$count"} = $r->{id};
         my $ref = {
               select         => {input => { name    => "report_$count",
                                             checked => $r->{checked},
-                                            type    => "checkbox",
+                                            type    => 'checkbox',
                                             value   => $r->{id},
                                           },
                                 },
-               id             => {href => $base_href . "&id=".$r->{id},
+               id             => {href => $base_href . '&id='.$r->{id},
                                   text => $r->{id},
                                  },
                report_date    => $r->{report_date},
@@ -568,7 +578,7 @@ sub report_results {
                total          => $r->{total}->to_output(money => 1),
         };
         for my $ac (@{$ar->{asset_classes}}){
-            if ($ac->{id} = $r->{asset_class}){
+            if ($ac->{id} == $r->{asset_class}){
                 $ref->{asset_class} = $ac->{label};
             }
         }
@@ -586,7 +596,7 @@ sub report_results {
                    type  => 'submit',
                    class => 'submit',
                    name  => 'action',
-                   value => 'approve'
+                   value => 'report_results_approve'
                    },
     ];
     my $template = LedgerSMB::Template->new(
@@ -596,12 +606,12 @@ sub report_results {
         template => 'form-dynatable',
         format => 'HTML'
     );
-    return $template->render_to_psgi({
+    return $template->render({
          form    => $ar,
          heading => $header,
          rows    => $rows,
          columns => $cols,
-         hiddens  => $request,
+         hiddens  => $hiddens,
         buttons  => $buttons,
    });
 }
@@ -618,15 +628,15 @@ sub report_details {
     my $locale = $request->{_locale};
     my $report = LedgerSMB::DBObject::Asset_Report->new({base => $request});
     $report->get;
-    if ($report->{report_class} == 2) {
+    if ($report->{report_class} == RC_DISPOSAL) {
       return disposal_details($report);
-    } elsif ($report->{report_class} == 4) {
+    } elsif ($report->{report_class} == RC_PARTIAL_DISPOSAL ) {
       return partial_disposal_details($report);
     }
     my @cols = qw(tag start_depreciation purchase_value method_short_name
                  usable_life basis prior_through prior_dep dep_this_time
                  dep_ytd dep_total);
-    $report->{title} = $locale->text("Report [_1] on date [_2]",
+    $report->{title} = $locale->text('Report [_1] on date [_2]',
                      $report->{id}, $report->{report_date}->to_output);
     my $header = {
                             tag => $locale->text('Tag'),
@@ -662,15 +672,15 @@ sub report_details {
                    type  => 'submit',
                    class => 'submit',
                    name =>  'action',
-                   value => 'approve'
+                   value => 'report_details_approve'
                    },
     ];
-    return $template->render_to_psgi({
+    return $template->render({
                        form => $report,
                     columns => \@cols,
                     heading => $header,
                        rows => $rows,
-                    hiddens => $report,
+                    hiddens => { id => $report->{id} },
                     buttons => $buttons
     });
 }
@@ -690,7 +700,7 @@ sub partial_disposal_details {
     my @cols = qw(tag begin_depreciation purchase_value description
                  percent_disposed disposed_acquired_value
                  percent_remaining remaining_aquired_value);
-    $report->{title} = $locale->text("Partial Disposal Report [_1] on date [_2]",
+    $report->{title} = $locale->text('Partial Disposal Report [_1] on date [_2]',
                         $report->{id}, $report->{report_date});
     my $header = {
                    tag                => $locale->text('Tag'),
@@ -731,15 +741,18 @@ sub partial_disposal_details {
                    type  => 'submit',
                    class => 'submit',
                    name =>  'action',
-                   value => 'approve'
+                   value => 'disposal_details_approve'
                    },
     ];
-    return $template->render_to_psgi({
+    return $template->render({
                        form => $report,
                     columns => \@cols,
                     heading => $header,
                        rows => $rows,
-                    hiddens => $report,
+                    hiddens => { id => $report->{id},
+                          gain_acct => $report->{gain_acct},
+                          loss_acct => $report->{loss_acct},
+                               },
                     buttons => $buttons
     });
 }
@@ -759,7 +772,7 @@ sub disposal_details {
     $report->get;
     my @cols = qw(tag description start_dep disposed_on dm purchase_value
                  accum_depreciation adj_basis disposal_amt gain_loss);
-    $report->{title} = $locale->text("Disposal Report [_1] on date [_2]",
+    $report->{title} = $locale->text('Disposal Report [_1] on date [_2]',
                      $report->{id}, $report->{report_date});
     my $header = {
                             tag => $locale->text('Tag'),
@@ -796,22 +809,25 @@ sub disposal_details {
                    type  => 'submit',
                    class => 'submit',
                    name =>  'action',
-                   value => 'approve'
+                   value => 'disposal_details_approve'
                    },
     ];
-    return $template->render_to_psgi({
+    return $template->render({
                        form => $report,
                     columns => \@cols,
                     heading => $header,
                        rows => $rows,
-                    hiddens => $report,
+                    hiddens => { id => $report->{id},
+                          gain_acct => $report->{gain_acct},
+                          loss_acct => $report->{loss_acct},
+                               },
                     buttons => $buttons
     });
 }
 
 =item disposal_details_approve
 
-Pass through function for form-dynatable's action munging.  An lias for
+Pass through function for form-dynatable's action munging.  An alias for
 report_details_approve.
 
 =cut
@@ -877,7 +893,7 @@ No inputs required or used.
 sub display_nbv {
     my ($request) = @_;
     my $report = LedgerSMB::Report::Assets::Net_Book_Value->new(%$request);
-    return $report->render_to_psgi($request);
+    return $report->render($request);
 }
 
 =item begin_import
@@ -897,7 +913,7 @@ sub begin_import {
         template => 'import_asset',
         format => 'HTML'
     );
-    return $template->render_to_psgi($request);
+    return $template->render($request);
 }
 
 =item run_import
@@ -911,6 +927,18 @@ See the Customization Notes section below for more info on how to set up
 CSV formats.
 
 =cut
+
+sub _import_file {
+    my $request = shift @_;
+
+    my $handle = $request->upload('import_file');
+    my $csv = Text::CSV->new;
+    $csv->header($handle);
+    my $import_entries = $csv->getline_all($handle);
+
+    return @$import_entries;
+}
+
 
 sub run_import {
 
@@ -944,7 +972,7 @@ sub run_import {
     for my $a (@{$asset->{dep_accounts}}){
        $dep_account->{"$a->{accno}"} = $a;
     }
-    for my $ail ($asset->import_file($request->{import_file})){
+    for my $ail (_import_file($request)){
         my $ai = LedgerSMB::DBObject::Asset->new({copy => 'base', base => $request});
         for (0 .. $#file_columns){
           $ai->{$file_columns[$_]} = $ail->[$_];
@@ -960,7 +988,7 @@ sub run_import {
             $ai->{start_depreciation} = $ai->{purchase_date};
         }
         if ($ai->{asset_class} !~ /Leasehold/i){
-           $ai->{usable_life} = $ai->{usable_life}/12;
+           $ai->{usable_life} = $ai->{usable_life}/MONTHS_PER_YEAR;
         }
         $ai->{dep_report_id} = $report_results->{id};
         $ai->{location_id} = $location->{"$ai->{location}"};
@@ -996,10 +1024,18 @@ sub run_import {
     return begin_import($request);
 }
 
-###TODO-LOCALIZE-DOLLAR-AT
-eval { do "scripts/custom/asset.pl"};
-
-1;
+{
+    local ($!, $@) = ( undef, undef);
+    my $do_ = 'scripts/custom/asset.pl';
+    if ( -e $do_ ) {
+        unless ( do $do_ ) {
+            if ($! or $@) {
+                warn "\nFailed to execute $do_ ($!): $@\n";
+                die ( "Status: 500 Internal server error (asset.pm)\n\n" );
+            }
+        }
+    }
+};
 
 =back
 
@@ -1008,10 +1044,15 @@ eval { do "scripts/custom/asset.pl"};
 The handling of CSV imports of fixed assets is handled by @file_columns.  This
 can be set in a custom/ file.
 
-=head1 Copyright (C) 2010, The LedgerSMB core team.
+=head1 LICENSE AND COPYRIGHT
+
+Copyright (C) 2011-2018 The LedgerSMB Core Team
 
 This file is licensed under the Gnu General Public License version 2, or at your
 option any later version.  A copy of the license should have been included with
 your software.
 
 =cut
+
+
+1;

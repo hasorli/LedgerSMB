@@ -18,6 +18,8 @@ var profile = (function(){
         releaseDir: "../../js",
         releaseName: "",
         action: "release",
+        // Usual Dojo optimizer is Google Closure.
+        // See http://lisperator.net/uglifyjs/ for UglifyJS
         layerOptimize: "uglify",
         optimize: "uglify",
         cssOptimize: "comments",
@@ -88,8 +90,6 @@ var profile = (function(){
             },
             "lsmb/main": {
                 include: [
-                    "lsmb/ComparisonSelectionBalance",
-                    "lsmb/ComparisonSelectionIncome",
                     "lsmb/DateTextBox",
                     "lsmb/Form",
                     "lsmb/Invoice",

@@ -1,20 +1,28 @@
-<?lsmb INCLUDE 'ui-header.html';
-PROCESS elements.html ?>
+<?lsmb PROCESS elements.html ?>
 <body class="lsmb <?lsmb dojo_theme ?>">
   <form data-dojo-type="lsmb/Form"
         id="system-settings"
         method="post"
         action="<?lsmb form.script ?>">
     <table width="100%"><col width="25%" align="right"><col><col>
-      <tr><th colspan="2" class="listtop"><?lsmb text('System Defaults') ?></th></tr>
+      <tr><th colspan="3" class="listtop"><?lsmb text('System Defaults') ?></th></tr>
         <?lsmb FOREACH GROUP IN default_settings ?>
-      <tr><th colspan="2" class="listheading"><?lsmb GROUP.title ?></th></tr>
+      <tr><th colspan="3" class="listheading"><?lsmb GROUP.title ?></th></tr>
       <?lsmb FOREACH ITEM IN GROUP.items ?>
       <tr>
         <th align="right"><?lsmb ITEM.label ?></th>
-        <td>
+        <td colspan="<?lsmb ITEM.info ? 1 : 2 ?>" style='white-space:nowrap'>
           <?lsmb
-             IF ITEM.type == 'YES_NO';
+             IF ITEM.name == 'password_duration';
+               PROCESS input element_data = {
+                       name = ITEM.name,
+                       type = 'text',
+                       value = form.${ITEM.name},
+                       size = 5,
+                       'data-dojo-type' = 'dijit/form/NumberTextBox',
+                       'data-dojo-props' = 'constraints:{min:0.00001,max:3653}',
+               };
+             ELSIF ITEM.type == 'YES_NO';
                IF form.${ITEM.name};
                  YES="CHECKED";
                  NO=undef;
@@ -53,7 +61,16 @@ PROCESS elements.html ?>
                        type = 'text'
                        value = form.${ITEM.name}
                        };
-             END; ?>
+             END;
+             IF ITEM.info;
+                "<td align='left'>";
+                FOREACH i IN ITEM.info;
+                    i = i.replace('\$1','<a href="http://currencies.apps.grandtrunk.net/" target="_blank">Historical currency converter web service</a>');
+                    "$i<br>";
+                END;
+                "</td>";
+             END;
+           ?>
         </td>
       </tr>
       <?lsmb END # FOREACH ITEM ?>
@@ -74,4 +91,3 @@ PROCESS elements.html ?>
                    text => text('Save')} ?>
   </form>
 </body>
-</html>

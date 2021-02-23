@@ -1,3 +1,6 @@
+
+package LedgerSMB::Report::co::Caja_Diaria;
+
 =head1 NAME
 
 LedgerSMB::Report::co::Caja_Diaria - Caja Diaria Reports (Colombia)
@@ -24,8 +27,8 @@ specific period.
 
 =cut
 
-package LedgerSMB::Report::co::Caja_Diaria;
 use Moose;
+use namespace::autoclean;
 use LedgerSMB::MooseTypes;
 extends 'LedgerSMB::Report';
 
@@ -110,7 +113,7 @@ Returns the localized template name
 =cut
 
 sub name {
-    return LedgerSMB::Report::text('Caja Diaria');
+    return 'Caja Diaria';
 }
 
 =item header_lines
@@ -187,12 +190,12 @@ sub run_report{
         $ref->{document_type} = $doctypes->{$ref->{document_type}}
                 if $doctypes->{$ref->{document_type}};
     }
-    $self->rows(\@rows);
+    return $self->rows(\@rows);
 }
 
 =back
 
-=head1 COPYRIGHT
+=head1 LICENSE AND COPYRIGHT
 
 COPYRIGHT (C) 2012 The LedgerSMB Core Team.  This file may be re-used following
 the terms of the GNU General Public License version 2 or at your option any

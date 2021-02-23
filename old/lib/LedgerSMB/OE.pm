@@ -44,7 +44,10 @@ use LedgerSMB::Sysconfig;
 use LedgerSMB::Num2text;
 use Log::Log4perl;
 
+use LedgerSMB::Magic qw(OEC_QUOTATION OEC_RFQ);
+
 my $logger = Log::Log4perl->get_logger('OE');
+
 =over
 
 =item get_files
@@ -124,10 +127,10 @@ sub save {
         $ordnumber = "quonumber";
         if ( $form->{vc} eq 'customer' ) {
         $numberfld = "sqnumber";
-        $class_id = 3;
+        $class_id = OEC_QUOTATION;
     } else {
         $numberfld = "rfqnumber";
-        $class_id = 4;
+        $class_id = OEC_RFQ;
     }
     }
     $form->{"$ordnumber"} =
@@ -143,7 +146,7 @@ sub save {
 
     ( $null, $form->{employee_id} ) = split /--/, $form->{employee};
     if ( !$form->{employee_id} ) {
-        ( $form->{employee}, $form->{employee_id} ) = $form->get_employee($dbh);
+        ( $form->{employee}, $form->{employee_id} ) = $form->get_employee;
         $form->{employee} = "$form->{employee}--$form->{employee_id}";
     }
 
@@ -296,7 +299,7 @@ sub save {
 
             if ( @taxaccounts && $form->round_amount( $taxamount, 2 ) == 0 ) {
                 if ( $form->{taxincluded} ) {
-                    foreach $item (@taxaccounts) {
+                    foreach my $item (@taxaccounts) {
                         $taxamount = $form->round_amount( $item->value, 2 );
                         $taxaccounts{ $item->account } += $taxamount;
                         $taxdiff                       += $taxamount;
@@ -305,14 +308,14 @@ sub save {
                     $taxaccounts{ $taxaccounts[0]->account } += $taxdiff;
                 }
                 else {
-                    foreach $item (@taxaccounts) {
+                    foreach my $item (@taxaccounts) {
                         $taxaccounts{ $item->account } += $item->value;
                         $taxbase{ $item->account }     += $taxbase;
                     }
                 }
             }
             else {
-                foreach $item (@taxaccounts) {
+                foreach my $item (@taxaccounts) {
                     $taxaccounts{ $item->account } += $item->value;
                     $taxbase{ $item->account }     += $taxbase;
                 }
@@ -455,7 +458,7 @@ sub save {
     $form->{name} = $form->{ $form->{vc} };
     $form->{name} =~ s/--$form->{"$form->{vc}_id"}//;
 
-    $form->add_shipto( $dbh, $form->{id}, 1);
+    $form->add_shipto($form->{id}, 1);
 
     # save printed, emailed, queued
 
@@ -551,7 +554,7 @@ sub delete {
     $sth->execute( $form->{id} ) || $form->dberror($query);
     $sth->finish;
 
-    foreach $spoolfile (@spoolfiles) {
+    foreach my $spoolfile (@spoolfiles) {
         unlink "${LedgerSMB::Sysconfig::spool}/$spoolfile" if $spoolfile;
     }
     return 1;
@@ -697,9 +700,11 @@ sub retrieve {
         my $taxrate;
         my $ptref;
         my $sellprice;
-        my $listprice;
 
         while ( $ref = $sth->fetchrow_hashref('NAME_lc') ) {
+            PriceMatrix::price_matrix( $pmh, $ref, $form->{transdate},
+                $decimalplaces, $form, $myconfig );
+
             $form->db_parse_numeric(sth=>$sth, hashref=>$ref);
 
             $bu_sth->execute($ref->{invoice_id});
@@ -722,9 +727,6 @@ sub retrieve {
             $tth->finish;
             chop $ref->{taxaccounts};
 
-            # preserve price
-            $sellprice = $ref->{sellprice};
-
             # multiply by exchangerate
             $ref->{sellprice} =
               $form->round_amount(
@@ -737,12 +739,6 @@ sub retrieve {
                     $ref->{$_} / $form->{ $form->{currency} },
                     $decimalplaces );
             }
-
-            # partnumber and price matrix
-            PriceMatrix::price_matrix( $pmh, $ref, $form->{transdate},
-                $decimalplaces, $form, $myconfig );
-
-            $ref->{sellprice} = $sellprice;
 
             $ref->{partsgroup} = $ref->{partsgrouptranslation}
               if $ref->{partsgrouptranslation};
@@ -758,7 +754,7 @@ sub retrieve {
     else {
 
         # get last name used
-        $form->lastname_used( $myconfig, $dbh, $form->{vc} )
+        $form->lastname_used($form->{vc})
           unless $form->{"$form->{vc}_id"};
 
         delete $form->{notes};
@@ -794,7 +790,7 @@ sub exchangerate_defaults {
     my $eth2 = $dbh->prepare($query) || $form->dberror($query);
 
     # get exchange rates for transdate or max
-    foreach $var ( split /:/, substr( $form->{currencies}, 4 ) ) {
+    foreach my $var ( split /:/, substr( $form->{currencies}, 4 ) ) {  ## no critic (ProhibitMagicNumbers) sniff
         $eth1->execute( $var, $form->{transdate} );
         my @exchangelist;
         @exchangelist = $eth1->fetchrow_array;
@@ -835,8 +831,6 @@ sub order_details {
     my $projectdescription;
     my $projectnumber_id;
     my $translation;
-    my $partsgroup;
-
     my @queryargs;
 
     my @taxaccounts;
@@ -844,8 +838,6 @@ sub order_details {
     my $tax;
     my $taxrate;
     my $taxamount;
-
-    my %translations;
 
     my $language_code = $form->{dbh}->quote( $form->{language_code} );
     $query = qq|
@@ -865,7 +857,7 @@ sub order_details {
     my $sortby;
 
     # sort items by project and partsgroup
-    for $i ( 1 .. $form->{rowcount} ) {
+    foreach my $i ( 1 .. $form->{rowcount} ) {
 
         if ( $form->{"id_$i"} ) {
 
@@ -960,7 +952,7 @@ sub order_details {
     delete $form->{projectnumber};
 
     # sort the whole thing by project and group
-    @sortlist = sort { $a->[5] cmp $b->[5] } @sortlist;
+    @sortlist = sort { $a->[5] cmp $b->[5] } @sortlist;  ## no critic (ProhibitMagicNumbers) sniff
 
     # if there is a warehouse limit picking
     if ( $form->{warehouse_id} && $form->{formname} =~ /(pick|packing)_list/ ) {
@@ -971,7 +963,7 @@ sub order_details {
             WHERE parts_id = ? AND warehouse_id = ?|;
         $sth = $dbh->prepare($query) || $form->dberror($query);
 
-        for $i ( 1 .. $form->{rowcount} ) {
+        foreach my $i ( 1 .. $form->{rowcount} ) {
             $sth->execute( $form->{"id_$i"}, $form->{warehouse_id} )
               || $form->dberror;
 
@@ -995,7 +987,7 @@ sub order_details {
     my $k = scalar @sortlist;
     my $j = 0;
 
-    foreach $item (@sortlist) {
+    foreach my $item (@sortlist) {
         $i = $item->[0];
         $j++;
 
@@ -1097,10 +1089,7 @@ sub order_details {
             my $decimalplaces = ( $dec > 2 ) ? $dec : 2;
 
             my $discount = $form->round_amount(
-                $sellprice *
-                  $form->parse_amount( $myconfig, $form->{"discount_$i"} ) /
-                  100,
-                $decimalplaces
+                $sellprice * $form->parse_amount( $myconfig, $form->{"discount_$i"} ) / 100, $decimalplaces
             );
 
             # keep a netprice as well, (sellprice - discount)
@@ -1164,7 +1153,7 @@ sub order_details {
             $taxamount =
               Tax::calculate_taxes( \@taxaccounts, $form, $linetotal, 1 );
             $taxbase = Tax::extract_taxes( \@taxaccounts, $form, $linetotal );
-            foreach $item (@taxaccounts) {
+            foreach my $item (@taxaccounts) {
                 push @taxrates, LedgerSMB::PGNumber->new(100) * $item->rate;
                 if ( $form->{taxincluded} ) {
                     $taxaccounts{ $item->account } += $item->value;
@@ -1322,7 +1311,7 @@ sub order_details {
 
     $tax = 0;
 
-    foreach $item ( sort keys %taxaccounts ) {
+    foreach my $item ( sort keys %taxaccounts ) {
         if ( $form->round_amount( $taxaccounts{$item}, 2 ) ) {
             $tax += $taxamount = $form->round_amount( $taxaccounts{$item}, 2 );
 
@@ -1609,7 +1598,7 @@ sub save_inventory {
     my $employee_id;
 
     ( $null, $employee_id ) = split /--/, $form->{employee};
-    ( $null, $employee_id ) = $form->get_employee($dbh) if !$employee_id;
+    ( $null, $employee_id ) = $form->get_employee if !$employee_id;
 
     $query = qq|
         SELECT serialnumber, ship
@@ -1947,7 +1936,7 @@ sub transfer {
 
     my $dbh = $form->{dbh};
 
-    ( $form->{employee}, $form->{employee_id} ) = $form->get_employee($dbh);
+    ( $form->{employee}, $form->{employee_id} ) = $form->get_employee;
 
     my @a = localtime;
     $a[5] += 1900;
@@ -2145,7 +2134,7 @@ sub generate_orders {
 
     my $sellprice;
 
-    foreach $vendor_id ( keys %a ) {
+    foreach my $vendor_id ( keys %a ) {
 
         %tax = ();
 
@@ -2259,7 +2248,7 @@ sub generate_orders {
         my $employee_id;
         my $department_id;
 
-        ( $null, $employee_id ) = $form->get_employee($dbh);
+        ( $null, $employee_id ) = $form->get_employee;
         ( $null, $department_id ) = split /--/, $form->{department};
         $department_id *= 1;
 

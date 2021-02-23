@@ -1,3 +1,6 @@
+
+package LedgerSMB::Report;
+
 =head1 NAME
 
 LedgerSMB::Report - Base Reporting Functionality for LedgerSMB
@@ -37,11 +40,11 @@ UI/reports/display_report template will be used.
 
 =cut
 
-package LedgerSMB::Report;
 use Moose;
+use namespace::autoclean;
 with 'LedgerSMB::PGObject', 'LedgerSMB::I18N';
 use LedgerSMB::Setting;
-
+use List::Util qw{ any };
 use LedgerSMB::Template;
 use LedgerSMB::App_State;
 
@@ -221,21 +224,33 @@ sub render {
     my $self = shift;
     my $request = shift;
 
-    $self->_render($request, renderer => 'render');
+    return $self->_render($request, renderer => 'render');
 }
 
-=item render_to_psgi
-
-As C<render>, but returns a psgi triplet, instead of printing the result
-to standard output.
-
-=cut
-
-sub render_to_psgi {
+sub _output_name {
     my $self = shift;
     my $request = shift;
 
-    return $self->_render($request, renderer => 'render_to_psgi');
+    return undef
+        unless $request->{format};
+
+    $self->format('html')
+        unless defined $self->format;
+
+
+    my $name = $self->name || '';
+    $name =~ s/ /_/g;
+
+    $name = $name . '_' . $self->from_date->to_output
+            if $self->can('from_date')
+               and defined $self->from_date
+               and defined $self->from_date->to_output;
+    $name = $name . '-' . $self->to_date->to_output
+            if $self->can('to_date')
+               and defined $self->to_date
+               and defined $self->to_date->to_output;
+
+    return $name;
 }
 
 sub _render {
@@ -248,12 +263,12 @@ sub _render {
     $self->run_report($request) if !defined $testref;
     # This is a hook for other modules to use to override the default
     # template --CT
-    local ($@);
+    local $@ = undef;
     eval {$template = $self->template};
     $template ||= 'Reports/display_report';
 
     # Sorting and Subtotal logic
-    my $url = LedgerSMB::App_State::get_relative_url();
+    my $url = $request->get_relative_url();
     $self->order_dir('asc') if defined $self->order_by;
     if (defined $self->old_order_by and ($self->order_by eq $self->old_order_by)){
         if (lc($self->order_dir) eq 'asc'){
@@ -266,21 +281,21 @@ sub _render {
     $url =~ s/&?order_dir=[^\&]*//g if $url;
     $self->order_url($url);
     $self->order_url(
-        "$url&old_order_by=".$self->order_by."&order_dir=".$self->order_dir
+        "$url&old_order_by=".$self->order_by.'&order_dir='.$self->order_dir
     ) if $self->order_by;
 
     my $rows = $self->rows;
     @$rows = sort {
                    my $srt_a = $a->{$self->order_by};
                    my $srt_b = $b->{$self->order_by};
-                   { # pre-5.14 compatibility block
-                       local ($@); # pre-5.14, do not die() in this block
-                       $srt_a = $srt_a->to_sort
-                           if eval { $srt_a->can('to_sort') };
-                       $srt_b = $srt_b->to_sort
-                           if eval { $srt_b->can('to_sort') };
-                   }
-                   no warnings 'numeric';
+
+                   local $@ = undef;
+                   $srt_a = $srt_a->to_sort
+                       if eval { $srt_a->can('to_sort') };
+                   $srt_b = $srt_b->to_sort
+                       if eval { $srt_b->can('to_sort') };
+
+                   no warnings 'numeric'; ## no critic ( ProhibitNoWarnings )
                    $srt_a <=> $srt_b or $srt_a cmp $srt_b;
               } @$rows
       if $self->order_by;
@@ -297,14 +312,12 @@ sub _render {
     for my $r (@{$self->rows}){
         for my $k (keys %$r){
             next if $exclude->{$k};
-            { # pre-5.14 compatibility block
-                local ($@); # pre-5.14, do not die() in this block
-                if (eval { $r->{$k}->isa('LedgerSMB::PGNumber') }){
-                    $total_row->{$k} ||= LedgerSMB::PGNumber->from_input('0');
-                    $total_row->{$k}->badd($r->{$k});
-                }
-            }
 
+            local $@ = undef;
+            if (eval { $r->{$k}->isa('LedgerSMB::PGNumber') }){
+                $total_row->{$k} ||= LedgerSMB::PGNumber->from_input('0');
+                $total_row->{$k}->badd($r->{$k});
+            }
         }
         if ($self->show_subtotals and defined $col_val and
             ($col_val ne $r->{$self->order_by})
@@ -325,29 +338,16 @@ sub _render {
     # Rendering
 
     $self->format('html') unless defined $self->format;
-    my $name = $self->name || '';
-    $name =~ s/ /_/g;
-    $name = $name . '_' . $self->from_date->to_output
-            if $self->can('from_date')
-               and defined $self->from_date
-               and defined $self->from_date->to_output;
-    $name = $name . '-' . $self->to_date->to_output
-            if $self->can('to_date')
-               and defined $self->to_date
-               and defined $self->to_date->to_output;
-    $name = undef unless $request->{format};
     my $columns = $self->show_cols($request);
 
     for my $col (@$columns){
         if ($col->{money}) {
             $col->{class} = 'money';
             for my $row(@{$self->rows}){
-                { # pre-5.14 compatibility block
-                    local ($@); # pre-5.14, do not die() in this block
-                    if ( eval {$row->{$col->{col_id}}->can('to_output')}){
-                        $row->{$col->{col_id}} =
-                            $row->{$col->{col_id}}->to_output(money => 1);
-                    }
+                local $@ = undef;
+                if ( eval {$row->{$col->{col_id}}->can('to_output')}){
+                    $row->{$col->{col_id}} =
+                        $row->{$col->{col_id}}->to_output(money => 1);
                 }
             }
         }
@@ -360,14 +360,16 @@ sub _render {
         my $lines = shift;
         return unless $lines;
         my @newlines = map { { name => $_->{name} } } @{$self->header_lines};
-        return [map { { %$_, %{shift @newlines} } } @$lines ];
+        return [map { +{ %$_, %{shift @newlines} } } @$lines ];
     };
     $template = LedgerSMB::Template->new(
         user => $LedgerSMB::App_State::User,
         locale => $self->locale,
         path => 'UI',
+        output_options => {
+            filename => $self->_output_name($request),
+        },
         template => $template,
-        output_file => $name,
         format => uc($request->{format} || 'HTML'),
     );
     my $render = $template->can($args{renderer});
@@ -395,12 +397,12 @@ Returns a list of columns based on selected ones from the report
 sub show_cols {
     my ($self, $request) = @_;
     my @retval;
-    for my $ref (@{$self->columns}){
+    for my $ref (@{$self->columns($request)}){
         if ($request->{"col_$ref->{col_id}"}){
             push @retval, $ref;
         }
         if ($ref->{col_id} =~ /bc_\d+/){
-            push @retval, $ref if $request->{"col_business_units"};
+            push @retval, $ref if $request->{'col_business_units'};
         }
     }
     if (scalar @retval == 0){
@@ -442,9 +444,10 @@ sub process_bclasses {
     for my $bu (@{$ref->{business_units}}){
      if($bu->[1]){#avoid message:Use of uninitialized value in hash element
         push @{$ref->{$bu->[0]}}, $bu->[1]
-                 unless grep(/$bu->[1]/, @{$ref->{$bu->[0]}});
+                 unless any { /$bu->[1]/ } @{$ref->{$bu->[0]}};
      }
     }
+    return;
 }
 
 =back
@@ -465,7 +468,7 @@ LedgerSMB::Report subclasses are written typically in a few parts:
 
 =back
 
-=head1 COPYRIGHT
+=head1 LICENSE AND COPYRIGHT
 
 COPYRIGHT (C) 2012 The LedgerSMB Core Team.  This file may be re-used under the
 terms of the LedgerSMB General Public License version 2 or at your option any

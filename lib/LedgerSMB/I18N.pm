@@ -1,3 +1,6 @@
+
+package LedgerSMB::I18N;
+
 =head1 NAME
 
 LedgerSMB::I18N - Translation role for LedgerSMB Moose classes
@@ -14,8 +17,8 @@ we look only to the current locale.
 
 =cut
 
-package LedgerSMB::I18N;
 use Moose::Role;
+use namespace::autoclean;
 use LedgerSMB::App_State;
 use LedgerSMB::Locale;
 
@@ -114,7 +117,7 @@ sub maketext {
 
 =back
 
-=head1 COPYRIGHT
+=head1 LICENSE AND COPYRIGHT
 
 COPYRIGHT (C) 2012 The LedgerSMB Core Team.  This file may be re-used under the
 terms of the LedgerSMB General Public License version 2 or at your option any

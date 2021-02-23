@@ -3,16 +3,16 @@
 use Module::CPANfile;
 use File::Find;
 
-BEGIN { 
+BEGIN {
  local $@;
-  eval { 
+  eval {
    require Test::Dependencies;
    if ($Test::Dependencies::VERSION < 0.20) {
        require Test::More;
        Test::More::plan(skip_all =>'Must have Test::Dependencies version 0.20 or higher, had version ' . $Test::Dependencies::VERSION);
        exit 0;
    }
-   Test::Dependencies->import();
+   Test::Dependencies->import(exclude => [ qw/ LedgerSMB PageObject / ], style => 'light');
   };
   if ($@){
        require Test::More;
@@ -20,15 +20,6 @@ BEGIN {
        exit 0;
   }
 }
-   
-   
-
-use Test::Dependencies exclude =>
-  [ qw/ LedgerSMB PageObject / ],
-  style => 'light';;
-
-
-use Data::Dumper;
 
 my $file = Module::CPANfile->load;
 
@@ -37,15 +28,14 @@ sub collect {
     return if $File::Find::name !~ m/\.(pm|pl)$/;
 
     my $module = $File::Find::name;
-    push @on_disk, $module
+    push @on_disk, $module;
 }
-find(\&collect, 'lib/', 'old/bin/', 'old/lib/', 'old/bin/');
+find(\&collect, 'lib/', 'old/bin/', 'old/lib/');
 
-push @on_disk, 'tools/starman.psgi';
+push @on_disk, 'bin/ledgersmb-server.psgi';
 
 ok_dependencies($file, \@on_disk,
                 phases => 'runtime',
-                ignores => [ 'App::LedgerSMB::Admin', 'Image::Size',
-                             'LaTeX::Driver', 'PGObject::Util::DBAdmin',
+                ignores => [ 'LaTeX::Driver',
                              'Starman', 'TeX::Encode::charmap'] );
 
